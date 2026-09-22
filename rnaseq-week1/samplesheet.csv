@@ -1,0 +1,13 @@
+sample_id,condition,replicate,library_type,r1_fastq,r2_fastq
+healthy_01,Healthy,1,paired,fastq/healthy_01_R1.fastq.gz,fastq/healthy_01_R2.fastq.gz
+healthy_02,Healthy,2,paired,fastq/healthy_02_R1.fastq.gz,fastq/healthy_02_R2.fastq.gz
+healthy_03,Healthy,3,single,fastq/healthy_03_R1.fastq.gz,
+healthy_04,Healthy,4,paired,fastq/healthy_04_R1.fastq.gz,fastq/healthy_04_R2.fastq.gz
+healthy_05,Healthy,5,paired,fastq/healthy_05_R1.fastq.gz,fastq/healthy_05_R2.fastq.gz
+healthy_06,Healthy,6,paired,fastq/healthy_06_R1.fastq.gz,fastq/healthy_06_R2.fastq.gz
+sle_01,SLE,1,paired,fastq/sle_01_R1.fastq.gz,fastq/sle_01_R2.fastq.gz
+sle_02,SLE,2,paired,fastq/sle_02_R1.fastq.gz,fastq/sle_02_R2.fastq.gz
+sle_03,SLE,3,paired,fastq/sle_03_R1.fastq.gz,fastq/sle_03_R2.fastq.gz
+sle_04,SLE,4,single,fastq/sle_04_R1.fastq.gz,
+sle_05,SLE,5,paired,fastq/sle_05_R1.fastq.gz,fastq/sle_05_R2.fastq.gz
+sle_06,SLE,6,paired,fastq/sle_06_R1.fastq.gz,fastq/sle_06_R2.fastq.gz
