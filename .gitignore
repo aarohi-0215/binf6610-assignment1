@@ -3,3 +3,7 @@ dev/
 *.bam
 *.vcf*
 *.fastq.gz
+
+# course-provided material, not my work
+*.zip
+rnaseq-week1/
