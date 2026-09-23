@@ -1,0 +1,22 @@
+{
+  "pipeline": {
+    "name": "variant-call",
+    "version": "1.0.0",
+    "implementation": "bash",
+    "git_sha": "d26c3b9",
+    "run_id": "2026-09-23T18:15:59Z-41015",
+    "started_at": "2026-09-23T18:15:59Z",
+    "finished_at": "2026-09-23T18:18:07Z",
+    "exit_status": "success"
+  },
+  "platform": {
+    "kind": "laptop",
+    "region": "smoke_1mb"
+  },
+  "reference": {
+    "genome": "/home/aaroubu/binf6610/assignment1/smoke/smoke.fa"
+  },
+  "samples": [ {"sample_id":"smoke_01","library_type":"paired","condition":"unaffected"},{"sample_id":"smoke_02","library_type":"paired","condition":"affected"},{"sample_id":"smoke_03","library_type":"single","condition":"affected"} ],
+  "outputs": [ {"stage":"analyze","type":"cohort_vcf","path":"cohort.filtered.vcf.gz","checksum":"sha256:32d0e501f1ccb29de0267eef13671b4f2bb2cbbb57e5e88252a0f62b8a9e8648"},{"stage":"qc_report","type":"multiqc","path":"multiqc_report.html","checksum":"sha256:6554aef4bd6abc6dff7aef9c6092445ed036a50729bbc34e098e3b2fe18e63cc"} ],
+  "metrics": [ {"metric":"n_variants_total","value":2965,"stage":"merge"},{"metric":"n_variants_pass","value":2920,"stage":"analyze"} ]
+}
