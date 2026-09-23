@@ -1,10 +1,14 @@
 # Assignment 1 — A germline variant-calling pipeline in Bash
 
-**Due:** Friday 25 September, 23:59 · **Worth:** 6 % of the course grade
+**Due:** Wednesday 30 September, 23:59 · **Worth:** 6 % of the course grade
 
 Build a ten-stage variant-calling pipeline in Bash. It is the same architecture as the RNA-seq
 pipeline built in class, applied to a different biological question — so the structure transfers and
 none of the code does.
+
+**It has to run end to end on your own laptop.** This week you run all ten stages on a small smoke
+dataset and hand in what the run produced. Next week the same code runs on the real cohort on
+Explorer.
 
 You get the acceptance tests that grade it. Run them before you submit.
 
@@ -12,36 +16,148 @@ You get the acceptance tests that grade it. Run them before you submit.
 
 ## What you are building
 
-Eight human genomes in, one annotated cohort VCF out.
+Eight human genomes in, one filtered cohort VCF out.
 
 | Stage | What it does | Tool |
 |---|---|---|
 | 0 `validate` | check the samplesheet and every input file **before any compute** | bash |
 | 1 `qc_raw` | QC metrics from the raw FASTQ | FastQC |
 | 2 `trim` | adapter and quality trimming | fastp |
-| 3 `align` | align to the whole GRCh38 | BWA-MEM |
+| 3 `align` | align to the reference | BWA-MEM |
 | 4 `postprocess` | sort, index, **mark duplicates** | samtools, GATK |
 | 5 `quantify` | per-sample variant calling into a GVCF | GATK HaplotypeCaller `-ERC GVCF` |
-| 6 `merge` | **joint genotyping** across all eight | GATK GenomicsDBImport + GenotypeGVCFs |
-| 7 `analyze` | hard-filter, then annotate | GATK VariantFiltration |
+| 6 `merge` | **joint genotyping** across every sample | GATK GenomicsDBImport + GenotypeGVCFs |
+| 7 `analyze` | hard-filter | GATK VariantFiltration |
 | 8 `qc_report` | one report across the cohort | MultiQC |
 | 9 `publish` | tidy TSVs + `manifest.json` | bash |
 
 Stages 0, 1, 2, 8 and 9 are structurally identical to the demo. Stages 3–7 are not. That split is
 the point of the assignment: **architecture transfers between problems, code does not.**
 
-### Restrict the analysis region, not the reference
+---
 
-Align to the **complete** GRCh38. Restrict *variant calling* to `chr20:1-10,000,000` with
-`-L chr20:1-10000000`.
+## Two ways to run a pipeline before it meets the real data
 
-This is not a shortcut, it is the correct method, and the difference matters. An aligner can only
-report that a read is unique among the sequences you gave it. Align to a subset and reads whose true
-home is on an absent chromosome pile up somewhere on the ones you kept — with high mapping quality,
-because within that subset they really are unique. Measured on this course's own data, a subset
-reference produced 106 confident alignments in a region where the sample had no such sequence.
+### The normal way: a slice of the real reads, against the whole reference
 
-So: whole genome for alignment, ten megabases for calling.
+In practice you develop against a small slice of the real reads — a few thousand per sample — and
+align it to the complete reference. The slice keeps each run short. The reference stays whole
+because an aligner can only report that a read is unique among the sequences you gave it. Align to a
+subset, and reads whose true home is on a missing chromosome pile up on the ones you kept — with high
+mapping quality, because within that subset they really are unique. Measured: a subset reference
+produced 106 confident alignments in a region where the sample had no such sequence. So you restrict
+the *calling region* with `-L`, and leave the reference alone.
+
+The cost is the reference itself. The whole GRCh38 and its BWA index are about 9 GB to download,
+and `bwa mem` needs about 6 GB of free memory to load the index — more than a laptop with 8 GB of
+memory has to spare.
+
+### The smoke test: a tiny reference, and reads simulated from it
+
+A smoke dataset is a complete miniature input: a small reference, reads made from that reference, and
+a record of what the reads contain. The one for this assignment is 1,000,000 bases of real GRCh38,
+renamed `smoke_1mb` so that nothing computed from it can be mistaken for a result about a
+chromosome, and three samples simulated from it with `wgsim`, which planted SNVs and small indels in
+each and wrote down where.
+
+The small reference is safe here for a specific reason: every read was simulated from those
+1,000,000 bases, so no read has a true home outside the reference, and the misplacement described
+above cannot happen. What you get is all ten stages in about a minute and a half on a laptop with
+8 GB of memory, and an answer to check your VCF against. What you do not get is anything about real
+data: the reads are simulated and the reference is not a chromosome.
+
+### This assignment uses both, in that order
+
+| | This week, on your laptop | Next week, on Explorer |
+|---|---|---|
+| Reads | the smoke dataset: 3 samples, simulated | the cohort: 8 samples, `chr20:1–10 Mb` at about 37× |
+| Reference | `smoke.fa`, 1 Mb, inside the smoke dataset | the whole GRCh38, already on Explorer |
+| Calling region | `smoke_1mb` | `chr20:1-10000000` |
+| What it tells you | the code runs end to end and finds the planted variants | the real answer |
+
+Only the reference and the calling region change between the two runs. Put `REF` and `REGION` in
+`conf/pipeline.env`, never in a stage script, and switching runs is a two-line edit.
+
+### The smoke dataset: this week
+
+<!-- FILE:w01-smoke-dataset.zip -->
+
+It unpacks to `smoke/`, 30 MB, with its own `README.txt`:
+
+| | |
+|---|---|
+| `samplesheet.csv` | six columns: `smoke_01` and `smoke_02` paired-end, `smoke_03` single-end |
+| `smoke.fa`, `.fai`, `.dict` and the BWA index | the reference, already indexed |
+| `smoke_0N_R1.fastq.gz` (and `_R2`) | the reads |
+| `smoke_0N.truth.txt` | the variants planted in each sample |
+
+Run your pipeline from inside `smoke/`, because the FASTQ paths in its samplesheet are relative to
+that folder, with the reference and the region set to the smoke values:
+
+```bash
+cd smoke
+REF=$PWD/smoke.fa REGION=smoke_1mb bash ~/your-repo/run_pipeline.sh samplesheet.csv ~/smoke-out
+```
+
+If your pipeline takes `REF` and `REGION` from `conf/pipeline.env` rather than from the environment,
+set them there instead. The sample names in your VCF must be the `sample_id` values — set `SM` in the
+read group you give `bwa mem` — because that is how each column is matched to its answer.
+
+When all ten stages have finished, copy two files from the run into your repository and commit them:
+
+```bash
+mkdir -p ~/your-repo/smoke-run
+cp ~/smoke-out/<your stage-7 VCF>       ~/your-repo/smoke-run/cohort.filtered.vcf.gz
+cp ~/smoke-out/<your stage-9 manifest>  ~/your-repo/smoke-run/manifest.json
+```
+
+A complete pipeline runs all ten stages on this data in about a minute and a half on a laptop with
+8 GB of memory, and finds between 92 % and 100 % of each sample's planted SNVs — the single-end
+sample, at about 9× depth, is the low one. The acceptance test asks for 80 % of each sample's.
+
+### The real run: next week, on Explorer
+
+The reference is the 1000 Genomes GRCh38 analysis set, `GRCh38_full_analysis_set_plus_decoy_hla.fa`,
+the reference the 1000 Genomes Project aligned these eight samples to. Its chromosome names carry the
+`chr` prefix (`chr20`), which is what `-L chr20:1-10000000` expects. It is ready on Explorer, with its
+`.fai`, `.dict` and BWA index beside it. Point your configuration at this path; do not copy it:
+
+```
+/courses/BINF6610.202710/data/refs/grch38-1000g/GRCh38_full_analysis_set_plus_decoy_hla.fa
+```
+
+**Optional, not graded: the normal way on your own laptop.** If your laptop has 16 GB of memory or
+more, you can download the same reference — about 9 GB — and develop against a slice of real reads:
+
+```bash
+mkdir -p ~/refs/grch38-1000g && cd ~/refs/grch38-1000g
+BASE=https://ftp.1000genomes.ebi.ac.uk/vol1/ftp/technical/reference/GRCh38_reference_genome
+for ext in fa fa.fai dict fa.amb fa.ann fa.bwt fa.pac fa.sa; do
+    curl -fLO -C - "${BASE}/GRCh38_full_analysis_set_plus_decoy_hla.${ext}"
+done
+```
+
+`-C -` resumes an interrupted download, so if the loop stops, run it again. For the slice you do not
+need the whole run: ENA serves each FASTQ gzipped over HTTP, so you can read the front of the stream
+and stop.
+
+```bash
+mkdir -p dev
+URL=ftp.sra.ebi.ac.uk/vol1/fastq/ERR166/081/ERR16657781/ERR16657781_1.fastq.gz
+curl -s "https://${URL}" | gzip -dc | head -16000 | gzip > dev/NA12878_R1.fastq.gz
+```
+
+`head` stops after 16,000 lines — 4,000 records — and closing the pipe stops the download: about
+640 KB and three seconds for both mates, out of a 19.3 GB file. Do the same with `_2.fastq.gz`; the
+two files are in the same order. Every sample's FASTQ links are listed by ENA's file report — replace
+the accession with the `run` column of the cohort table:
+
+```
+https://www.ebi.ac.uk/ena/portal/api/filereport?accession=ERR3989341&result=read_run&fields=fastq_ftp
+```
+
+The first reads of a FASTQ come from the edge of the flowcell and are not a random sample of the
+library, so a slice like this is for testing code, not for measuring anything.
 
 ---
 
@@ -64,9 +180,8 @@ You build your `samplesheet.csv` from it. `library_type` is what your pipeline b
 they cover `chr20:1–10,000,000` at about 37×. That is the copy you run the pipeline against **next
 week, on the cluster**, and it is the reason you never have to move sequencing data anywhere.
 
-**This week, on your laptop, you do not use them.** You cut your own development slice instead —
-step 3 of *Getting started* below shows how, and it costs about 640 KB and three seconds. The `run`
-column is the ENA accession that slice comes from.
+**This week, on your laptop, you do not use them**: you run the smoke dataset above. The `run` column
+is each sample's ENA accession.
 
 | | |
 |---|---|
@@ -103,6 +218,9 @@ your-repo/
 ├── conf/pipeline.env        # configuration, no secrets
 ├── samplesheet.csv          # the eight samples
 ├── TROUBLESHOOTING.md       # see below
+├── smoke-run/               # COMMIT THESE TWO — from your full run on the smoke dataset
+│   ├── cohort.filtered.vcf.gz     your stage-7 VCF
+│   └── manifest.json              your stage-9 manifest
 └── results/                 # DO NOT COMMIT — .gitignore it
 ```
 
@@ -128,7 +246,8 @@ wrote it, and prints which form it detected in its first two lines. The third ar
 **last stage to run** — being able to stop after `validate` is what gives you a one-second
 edit-run loop, and most of the tests depend on it.
 
-Submit a link to a Git repository. Do not commit FASTQ files, BAMs, VCFs, or the reference.
+Submit a link to a Git repository. Do not commit FASTQ files, BAMs or the reference. The only VCF you
+commit is the smoke run's, in `smoke-run/`.
 
 ### Set the repository up first — before your first run
 
@@ -157,23 +276,25 @@ error to fix; it is the pipeline being straight with you about what it can and c
 
 ## How it is graded
 
-**90 points — acceptance tests.** In `tests/`. You run them; they are the same file used to grade.
-**Every one of them checks something week 1 taught**, and when one fails it says what to go back to.
+**90 points — nine acceptance tests.** In `tests/`. You run them; they are the same file used to
+grade. **Every one of them checks something week 1 taught**, and when one fails it says what to go
+back to.
 
 | Pts | Test | Full marks | Partial |
 |---:|---|---|---|
+| 20 | the whole pipeline ran on the smoke dataset | `smoke-run/` holds your VCF, with a column for each of the three samples and at least 80 % of each sample's planted SNVs, and the manifest from the same run | **10** — the VCF is there, but a sample is missing or below 80 %, or the manifest is missing |
 | 20 | stage 0 reports every problem together | four samples, three of them broken, non-zero exit, all three named | **10** — it fails, but names only the first problem it met |
-| 15 | survives a sample named `Donor 3-rep1` | the name is carried through intact | — |
+| 10 | survives a sample named `Donor 3-rep1` | the name is carried through intact | — |
 | 10 | catches a truncated `.fastq.gz` | fails in stage 0 **and** names the sample | **5** — caught, but the message never says which sample |
 | 10 | rejects a duplicate `sample_id` | non-zero exit **and** the message names it | **5** — rejected, but never names the duplicate |
-| 10 | single-end read from `library_type` | branches on the column, not on the sample's name | — |
-| 10 | `set -euo pipefail` in every script | all three flags, in every `.sh` you ship | **5** — some scripts only |
-| 10 | progress messages go to stderr | stage 0 reports on stderr and leaves stdout empty | — |
+| 5 | single-end read from `library_type` | branches on the column, not on the sample's name | — |
+| 5 | `set -euo pipefail` in every script | all three flags, in every `.sh` you ship — the files you `source` included | — |
+| 5 | progress messages go to stderr | stage 0 reports on stderr and leaves stdout empty | — |
 | 5 | no sample is named in the code | none of the eight ids appears outside a comment | — |
 
 The partial bands are transcriptions of what the harness printed, not estimates of how nearly
-something worked. Four criteria have none, because there the harness cannot tell two failures apart
-and an invented middle rating would turn a measurement into an argument.
+something worked. The rows without one are worth 5 points, or the harness cannot tell two failures
+apart there, and an invented middle rating would turn a measurement into an argument.
 
 Run them:
 
@@ -181,8 +302,10 @@ Run them:
 bash tests/run_acceptance.sh /path/to/your-repo
 ```
 
-They need no sequencing data. Every one runs in seconds against fixtures the harness builds itself —
-so there is no excuse for finding out at submission time. They invoke your driver as
+Eight of them need no sequencing data: they run in seconds against fixtures the harness builds
+itself, so there is no excuse for finding out at submission time. The smoke test reads `smoke-run/`
+in your repository, so it passes once you have copied your smoke run's two files there. The other
+eight invoke your driver as
 
 ```bash
 ./run_pipeline.sh <samplesheet.csv> <outdir> validate
@@ -222,50 +345,30 @@ you are marked against — nothing is hidden and nothing is held back.
 2. **Copy the architecture, not the code.** The samplesheet as the only input, stage 0
    collecting every problem before anything computes, a check after every tool, messages on
    stderr — all of that transfers. None of the tool calls do.
-3. **Cut your own development slice before you run anything for real.** A few thousand reads per
-   sample is enough to answer *does my code run*, and that is the only question a laptop can answer.
-
-   You do **not** have to download a whole run to get one. The file is gzipped and ENA serves it over
-   HTTP, so you can read the front of the stream and stop:
-
-   ```bash
-   mkdir -p dev
-   URL=ftp.sra.ebi.ac.uk/vol1/fastq/ERR166/081/ERR16657781/ERR16657781_1.fastq.gz
-   curl -s "https://${URL}" | gzip -dc | head -16000 | gzip > dev/NA12878_R1.fastq.gz
-   ```
-
-   `head` stops after 16,000 lines — 4,000 records — and closing the pipe stops the download.
-   Measured against that run: **640 KB and about three seconds for both mates**, out of a file that
-   is 19.3 GB. Do the same with `_2.fastq.gz` for R2; the two files are in the same order, so record
-   *n* of one is the mate of record *n* of the other. Then point a second samplesheet at `dev/` and
-   develop against that.
-
-   **This is a slice for testing code, not for measuring anything.** The first reads in a FASTQ come
-   from the edge of the flowcell and are not a random sample of the library — the same caveat that
-   applies to the cohort's own read sets. If you already have a full file on disk and want an
-   unbiased slice, `seqtk sample -s100 file.fastq.gz 5000` is the tool.
-
-   A run that takes four seconds is a run you will do two hundred times; a run that takes an hour is
-   one you will do twice.
+3. **Download the smoke dataset, and put `REF` and `REGION` in `conf/pipeline.env`** with the smoke
+   values. Every run you do this week is against that folder.
 4. **Build stage 0 first, and run it constantly.** Six of the nine tests run through stage 0, and
    three of those six are gated on it: they check how a sample is *handled*, so the harness first
    confirms your driver reads the samplesheet at all before it will award them. It is also the stage
    that saves you the most time while you develop.
-5. **Then one stage at a time, on one sample**, before you loop over eight.
+5. **Then one stage at a time, on one smoke sample**, before you run all three.
+6. **Run all ten stages on the smoke dataset, copy the two files into `smoke-run/`, and commit.**
+   Check your VCF against `smoke_0N.truth.txt` yourself before the test does.
 
 ### How long this should take to run
 
-**Seconds, this week.** You are developing against a slice of a few thousand reads, and the
-acceptance tests build their own fixtures and need no sequencing data at all — the whole suite runs
-in about ten seconds. If any part of your edit-run loop takes minutes, your slice is too big.
+**Seconds for the edit-run loop.** Stage 0 on the smoke samplesheet takes a second, and the
+acceptance tests run in about ten.
+
+**About a minute and a half for a full smoke run**, all ten stages, on a laptop with 8 GB of memory.
 
 **The full cohort is next week's run, on Explorer.** Measured there on one sample of the prepared
 read set: 97 seconds for BWA-MEM on 8 cores, 6.3 GB of memory, a 104 MB BAM. Eight of those as a
 job array is minutes, not hours.
 
 What this means for how you work: **do not wait until you have real output to find out whether your
-pipeline is correct.** Nine criteria say what correct means and you can run eight of them yourself
-right now, before you have aligned a single read.
+pipeline is correct.** You can run all nine tests yourself before you submit — eight of them before
+you have aligned a single read.
 
 > **`set -euo pipefail` is necessary and not sufficient.** Six places where `-e` does not fire were
 > covered in the lecture, and at least two of them are reachable in this assignment. Assertions on
