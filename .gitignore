@@ -7,3 +7,7 @@ dev/
 # course-provided material, not my work
 *.zip
 rnaseq-week1/
+
+# input dataset (do not commit) and old test backup
+smoke/
+tests_OLD/
