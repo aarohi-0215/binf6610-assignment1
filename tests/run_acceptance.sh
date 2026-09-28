@@ -1,541 +1,366 @@
 #!/usr/bin/env bash
 #-----------------------------------------------------------------------------
-# run_acceptance.sh — the tests that grade Assignment 1.
+# run_acceptance.sh — the tests that grade Assignment 2.
 #
 #   bash tests/run_acceptance.sh /path/to/your-repo
-#   bash tests/run_acceptance.sh /path/to/your-repo name    # only matching tests
+#   bash tests/run_acceptance.sh /path/to/your-repo afterok   # one test
 #
-# This is the same file used for grading. Nothing is hidden, and you should run
-# it constantly rather than once at the end.
+# RUNS ON YOUR LAPTOP. Not on the cluster, and it submits nothing.
 #
-# EVERY CHECK HERE IS SOMETHING WEEK 1 TAUGHT. If a test surprises you, the
-# lecture covered it and the demo pipeline shows it — go back to that slide.
+# That is deliberate, and it is also a limitation worth understanding. Everything
+# here is read out of your scripts: whether the array size is derived, whether the
+# dependency is `afterok`, whether threads come from Slurm. A test that actually
+# submitted jobs would queue for an unknown time, cost real compute, and fail for
+# reasons that have nothing to do with your code.
 #
-# NO SEQUENCING DATA IS REQUIRED. Every fixture is built here, in a temp
-# directory, out of a handful of synthetic reads, so the whole suite runs in
-# seconds and there is no excuse for discovering a failure at submission time.
-#
-# ONE TEST READS THE RESULT OF YOUR OWN FULL RUN. Run all ten stages on the
-# smoke dataset, copy the two files the brief names into `smoke-run/`, and the
-# smoke test scores your VCF against the variants planted in those reads. The
-# answer files it scores against are in `tests/smoke-truth/`.
-#
-# HOW YOUR PIPELINE IS INVOKED
-#
-#     ./run_pipeline.sh <samplesheet.csv> <outdir> validate
-#
-# Three positional arguments, exactly like the demo: the sheet, where to write,
-# and the last stage to run. `validate` must run stage 0 and stop. If your
-# driver cannot stop after a named stage it will fail most of these tests — and
-# it is the thing you will want most while developing, because it is how you
-# test stage 0 without waiting for an alignment.
-#
-# THE SAMPLESHEET THESE TESTS HAND YOU
-#
-# Six columns, no quoting, the same contract as the demo:
-#
-#     sample_id,condition,replicate,library_type,r1_fastq,r2_fastq
-#
-# WHAT THIS SUITE CANNOT SEE
-#
-# One test reads your code rather than running it — `set -euo pipefail` is
-# checked by looking for it, because proving it fires needs a real alignment to
-# kill. It says so in its own output. Passing it is necessary, not sufficient.
-#
-# Three tests pass when stage 0 raises no complaint, so they are gated behind a
-# positive control that proves your driver reads the samplesheet at all. See
-# `sheet_is_read` below for why.
+# So nine of these check that you wrote the right thing. The tenth reads what
+# the cluster produced when you ran it -- the cohort VCF and manifest you commit
+# in cluster-run/ -- so a suite passed without ever submitting a job now fails
+# the test worth the most.
 #-----------------------------------------------------------------------------
-set -uo pipefail        # NOT -e: a failing assertion must not stop the suite
+set -uo pipefail
 
 if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 3) )); then
-    printf 'error: bash >= 4.3 required to run these tests, found %s\n' "${BASH_VERSION}" >&2
-    printf '       on macOS: brew install bash, then run with /opt/homebrew/bin/bash\n' >&2
-    exit 70
+    printf 'error: bash >= 4.3 required, found %s\n' "${BASH_VERSION}" >&2; exit 70
 fi
 
 REPO=${1:-.}
 FILTER=${2:-}
-REPO=$(cd -- "${REPO}" && pwd) || { printf 'error: no such directory: %s\n' "${1:-.}" >&2; exit 66; }
+REPO=$(cd -- "${REPO}" && pwd) || { printf 'error: no such directory\n' >&2; exit 66; }
 HERE=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-
-WORK=$(mktemp -d "${TMPDIR:-/tmp}/binf6610-accept.XXXXXX") || exit 70
-trap 'rm -rf "${WORK}"' EXIT
 
 pass=0 fail=0
 declare -a FAILURES=()
-
-if [[ -t 1 ]]; then
-    C_OK=$'\033[0;32m'; C_BAD=$'\033[0;31m'
-    C_DIM=$'\033[0;90m'; C_RST=$'\033[0m'
-else
-    C_OK='' C_BAD='' C_DIM='' C_RST=''
-fi
+if [[ -t 1 ]]; then C_OK=$'\033[0;32m'; C_BAD=$'\033[0;31m'; C_DIM=$'\033[0;90m'; C_RST=$'\033[0m'
+else C_OK='' C_BAD='' C_DIM='' C_RST=''; fi
 
 want() { [[ -z "${FILTER}" ]] || [[ "$1" == *"${FILTER}"* ]]; }
-
-ok()   { pass=$(( pass + 1 )); printf '  %sPASS%s  %s\n' "${C_OK}"  "${C_RST}" "$1"; }
+ok()   { pass=$(( pass + 1 )); printf '  %sPASS%s  %s\n' "${C_OK}" "${C_RST}" "$1"; }
 no()   { fail=$(( fail + 1 )); FAILURES+=( "$1" )
          printf '  %sFAIL%s  %s\n' "${C_BAD}" "${C_RST}" "$1"
          [[ -n "${2:-}" ]] && printf '        %s%s%s\n' "${C_DIM}" "$2" "${C_RST}"; }
 note() { printf '        %s%s%s\n' "${C_DIM}" "$1" "${C_RST}"; }
 
-#-----------------------------------------------------------------------------
-# Fixtures. Four-line records, real gzip, deliberately tiny.
-#-----------------------------------------------------------------------------
-fq() {                       # fq <path> <n_records>
-    local path=$1 n=$2 i
-    { for (( i = 1; i <= n; i++ )); do
-          printf '@read%d/1\nACGTACGTACGTACGTACGT\n+\nIIIIIIIIIIIIIIIIIIII\n' "${i}"
-      done
-    } | gzip -c > "${path}"
-}
+SL="${REPO}/slurm"
+printf '\n%sBINF6610 Assignment 2 — acceptance tests%s\n%srepo: %s%s\n\n' \
+    "${C_DIM}" "${C_RST}" "${C_DIM}" "${REPO}" "${C_RST}"
 
-FQ="${WORK}/fastq"
-mkdir -p "${FQ}"
-for s in NA12878 NA12891 NA12892; do
-    fq "${FQ}/${s}_R1.fastq.gz" 4
-    fq "${FQ}/${s}_R2.fastq.gz" 4
-done
-fq "${FQ}/shortmate_R1.fastq.gz" 5
-fq "${FQ}/shortmate_R2.fastq.gz" 4          # one mate short
-fq "${FQ}/Donor 3-rep1_R1.fastq.gz" 4       # a space and a hyphen, on purpose
-fq "${FQ}/Donor 3-rep1_R2.fastq.gz" 4
+[[ -d "${SL}" ]] || { printf '  %sFAIL%s  no slurm/ directory in %s\n\n' "${C_BAD}" "${C_RST}" "${REPO}"; exit 1; }
 
-# A real gzip stream with its tail cut off: `gzip -t` must reject it.
-# Cut to HALF the file's length, never to a fixed byte count: twenty identical
-# records compress to about 109 bytes, so any fixed cut longer than that copies
-# the whole file and leaves a fixture that is not broken at all. And check the
-# fixture before grading anyone with it — if it ever passes `gzip -t`, every
-# correct stage 0 would be marked wrong, so the harness stops instead.
-fq "${FQ}/whole.fastq.gz" 20
-head -c $(( $(wc -c < "${FQ}/whole.fastq.gz") / 2 )) "${FQ}/whole.fastq.gz" > "${FQ}/cut_R1.fastq.gz"
-if gzip -t "${FQ}/cut_R1.fastq.gz" 2>/dev/null; then
-    printf 'harness error: the truncated-gzip fixture is a valid gzip file, so it tests nothing.\n' >&2
-    exit 2
-fi
-cp "${FQ}/NA12891_R2.fastq.gz"            "${FQ}/cut_R2.fastq.gz"
+# All sbatch scripts plus the submitter, as one searchable blob. Which file a
+# thing is in is your design decision; that it is somewhere is the requirement.
+mapfile -t SLFILES < <(find "${SL}" -type f \( -name '*.sbatch' -o -name '*.sh' -o -name '*.env' \) | sort)
+BLOB=$(cat "${SLFILES[@]}" 2>/dev/null)
 
-# The contract, and nothing else. Six columns, unquoted — the same sheet the
-# demo pipeline reads, so `while IFS=, read -r id cond rep lt r1 r2` works.
-HDR='sample_id,condition,replicate,library_type,r1_fastq,r2_fastq'
-
-sheet() {                    # sheet <name> <rows...>  -> prints the path
-    local name=$1; shift
-    local p="${WORK}/${name}.csv"
-    printf '%s\n' "${HDR}" > "${p}"
-    printf '%s\n' "$@" >> "${p}"
-    printf '%s' "${p}"
-}
-
-row() {                      # row <id> <condition> <rep> <libtype> <r1> [r2]
-    printf '%s,%s,%s,%s,%s,%s' "$1" "$2" "$3" "$4" "$5" "${6:-}"
-}
-
-GOOD=$(sheet good \
-    "$(row NA12878 affected   1 paired "${FQ}/NA12878_R1.fastq.gz" "${FQ}/NA12878_R2.fastq.gz")" \
-    "$(row NA12891 unaffected 2 paired "${FQ}/NA12891_R1.fastq.gz" "${FQ}/NA12891_R2.fastq.gz")")
-
-DUP=$(sheet duplicate \
-    "$(row NA12878 affected   1 paired "${FQ}/NA12878_R1.fastq.gz" "${FQ}/NA12878_R2.fastq.gz")" \
-    "$(row NA12878 unaffected 2 paired "${FQ}/NA12891_R1.fastq.gz" "${FQ}/NA12891_R2.fastq.gz")")
-
-CUT=$(sheet cutgzip \
-    "$(row NA12878 affected   1 paired "${FQ}/NA12878_R1.fastq.gz" "${FQ}/NA12878_R2.fastq.gz")" \
-    "$(row NA12891 unaffected 2 paired "${FQ}/cut_R1.fastq.gz"     "${FQ}/cut_R2.fastq.gz")")
-
-WEIRD=$(sheet weirdname \
-    "$(row 'Donor 3-rep1' affected 1 paired "${FQ}/Donor 3-rep1_R1.fastq.gz" "${FQ}/Donor 3-rep1_R2.fastq.gz")" \
-    "$(row NA12891 unaffected 2 paired "${FQ}/NA12891_R1.fastq.gz" "${FQ}/NA12891_R2.fastq.gz")")
-
-# The single-end sample here is NOT one of the two that are single-end in the real
-# cohort. A pipeline that hard-codes which samples are single-end passes on the
-# real sheet and fails right here, which is the entire point of the test.
-SINGLE=$(sheet singleend \
-    "$(row NA12878 affected   1 single "${FQ}/NA12878_R1.fastq.gz" "")" \
-    "$(row NA12891 unaffected 2 paired "${FQ}/NA12891_R1.fastq.gz" "${FQ}/NA12891_R2.fastq.gz")")
-
-# Three different problems, in three different samples, all at once. A stage 0
-# that dies on the first one names only BADPATH.
-MANY=$(sheet manyproblems \
-    "$(row BADPATH  affected   1 paired "${FQ}/does_not_exist_R1.fastq.gz" "${FQ}/does_not_exist_R2.fastq.gz")" \
-    "$(row NOMATE   unaffected 2 paired "${FQ}/NA12891_R1.fastq.gz" "")" \
-    "$(row CUTGZIP  affected   3 paired "${FQ}/cut_R1.fastq.gz"     "${FQ}/cut_R2.fastq.gz")" \
-    "$(row NA12892  unaffected 4 paired "${FQ}/NA12892_R1.fastq.gz" "${FQ}/NA12892_R2.fastq.gz")")
-
-#-----------------------------------------------------------------------------
-# validate <sheet> <outdir> -> prints "<exit>|<combined output>"
-#-----------------------------------------------------------------------------
-# HOW YOUR DRIVER IS CALLED, and why there are two ways.
+#-- 1 · the orchestration contains no biology  (5 pts) -----------------------
+# What the week claims is narrow and checkable: the new files are about
+# SCHEDULING, and the analysis stayed where it was. So look for tool names in
+# slurm/. If bwa or gatk appears there, the boundary has moved.
 #
-# The demo pipeline takes three positional arguments and the brief documents
-# that. One slide in the lecture writes the same thing as `--to validate`. Both
-# readings are defensible, so this harness does not pick a winner: it reads your
-# driver once and calls it the way you wrote it. Whichever you chose, every test
-# below runs against it.
-INVOKE=positional
-if grep -qE -- '--samplesheet|--outdir|--to[[:space:]]|--to=' "${REPO}/run_pipeline.sh" 2>/dev/null \
-   || grep -rqE -- '--samplesheet|--outdir' "${REPO}/lib" 2>/dev/null; then
-    INVOKE=flags
-fi
-
-run_validate() {
-    local sheet=$1 outdir=$2 out rc
-    if [[ "${INVOKE}" == flags ]]; then
-        out=$( cd "${REPO}" && bash ./run_pipeline.sh \
-                 --samplesheet "${sheet}" --outdir "${outdir}" --to validate 2>&1 )
+# An earlier version of this suite hashed lib/ and stages/ against a baseline
+# and demanded they be byte-identical to assignment 1. That was unfair and
+# impossible -- the baseline was the reference solution's code, not yours -- and
+# it punished anyone who improved their week-1 pipeline. Improving it is fine.
+if want "no bioinformatics"; then
+    LEAKED=$(grep -oE '\b(bwa|gatk|samtools|bcftools|fastqc|fastp|hisat2|featureCounts|multiqc)\b' \
+             <<< "${BLOB}" | sort -u | tr '\n' ' ')
+    if [[ -z "${LEAKED}" ]]; then
+        ok "slurm/ contains no bioinformatics tool calls"
+        note "the new files orchestrate; the analysis stayed in stages/"
     else
-        out=$( cd "${REPO}" && bash ./run_pipeline.sh "${sheet}" "${outdir}" validate 2>&1 )
+        no "slurm/ contains no bioinformatics tool calls" \
+           "found: ${LEAKED}- a batch script that runs a tool has started doing the analysis.
+        Call your pipeline from the batch script and let it call the tools."
     fi
-    rc=$?
-    printf '%s|%s' "${rc}" "${out}"
-}
+fi
 
-# Stage 0 validates the REFERENCE as well as the samplesheet, and it is right to.
-# But a GRCh38 index is five gigabytes and an hour to build, so these tests must
-# not require one. A positive test therefore asserts that stage 0 raised no
-# complaint ABOUT THE SAMPLE — a reference that is not built yet is reported once,
-# on its own, rather than showing up as several mysterious failures.
-ref_complaint() {
-    [[ "$1" == *"index"* || "$1" == *"GTF"* || "$1" == *"reference"* \
-       || "$1" == *"genome"* || "$1" == *"FASTA"* || "$1" == *"fasta"* ]]
-}
-# sample_ok <output> <sample_id> -> 0 if nothing was said against that sample
-sample_ok() {
-    local out=$1 id=$2 line
-    while IFS= read -r line; do
-        [[ "${line}" == *"${id}"* ]] || continue
-        [[ "${line}" == *ERROR* || "${line}" == *error* ]] || continue
-        ref_complaint "${line}" && continue
-        return 1
-    done <<< "${out}"
-    return 0
-}
+#-- 2 · a per-sample entry point  (5 pts) ------------------------------------
+# Stages 6-9 need every sample, and one array task cannot know whether the
+# others finished. So the pipeline needs a second way in, and it should decline
+# the cohort stages rather than silently building a cohort from one sample.
+if want "per-sample entry point"; then
+    ENTRY=$(grep -ohE '[A-Za-z0-9_./${}"-]*run_sample[A-Za-z0-9_.-]*\.sh' <<< "${BLOB}" | head -1)
+    ENTRY_FILE=$(find "${REPO}" -maxdepth 2 -name 'run_sample*.sh' -o -maxdepth 2 -name '*per_sample*.sh' 2>/dev/null | head -1)
+    if [[ -z "${ENTRY}" && -z "${ENTRY_FILE}" ]]; then
+        no "the pipeline has a per-sample entry point" \
+           "nothing in slurm/ calls a per-sample script, and there is no run_sample.sh.
+        An array task runs ONE sample; run_pipeline.sh runs all of them. Both call the
+        same stages, which is why the stages moved into their own files."
+    elif [[ -n "${ENTRY_FILE}" ]] && grep -qE 'merge|analyze|qc_report|publish|cohort' "${ENTRY_FILE}" \
+         && grep -qE 'die|exit|refus|stops at' "${ENTRY_FILE}"; then
+        ok "the pipeline has a per-sample entry point, and it declines the cohort stages"
+    else
+        no "the pipeline has a per-sample entry point, and it declines the cohort stages" \
+           "it exists, but it does not visibly refuse stages 6-9. A task that runs merge on
+        one sample produces a cohort result built from one sample, eight times over."
+    fi
+fi
 
-# A POSITIVE CONTROL, because silence is not evidence.
-#
-# Stage 0's correct answer to a good sample is to say nothing about it. Several
-# tests therefore pass when the output holds no complaint naming the sample —
-# which is exactly what a driver that never opens the samplesheet also produces.
-# Measured 2026-09-07: a two-line `run_pipeline.sh` whose whole body was
-# `echo hello` scored 4 of 9 on the previous version of this suite, and three of
-# those four were these tests. That is a check reporting PASS while measuring
-# nothing, which is the failure this course exists to teach.
-#
-# The weakest fair control is the one used here: a pipeline that reads the sheet
-# must answer DIFFERENTLY when handed one that is not there. It asks for nothing
-# the brief does not already require.
-SHEET_IS_READ=-1
-sheet_is_read() {
-    if (( SHEET_IS_READ < 0 )); then
-        local with_sheet without_sheet
-        with_sheet=$(run_validate    "${GOOD}"                         "${WORK}/probe-with")
-        without_sheet=$(run_validate "${WORK}/no-such-samplesheet.csv" "${WORK}/probe-without")
-        if [[ "${with_sheet}" != "${without_sheet}" ]]; then
-            SHEET_IS_READ=1
+#-- 3 · the array index selects the right row  (15 pts) ----------------------
+# Two separate things, and the second is the one people miss.
+#   - the header has to be skipped, or every sample is processed under its
+#     neighbour's name and you get a complete, plausible, entirely wrong result
+#   - an array wider than the sheet hands a task an EMPTY sample name, and a
+#     pipeline given no sample succeeds at every stage and exits 0
+if want "array index"; then
+    IDX_OK=0; SKIP_OK=0; EMPTY_OK=0
+    grep -q 'SLURM_ARRAY_TASK_ID' <<< "${BLOB}" && IDX_OK=1
+    grep -qE 'NR *== *[A-Za-z_${}"]*n[A-Za-z_${}"]* *\+ *1|NR *> *1|tail -n \+2|NR *== *\$?\{?SLURM_ARRAY_TASK_ID\}? *\+ *1|\+ *1 *\{ *print|sed -n .*\+ *1' <<< "${BLOB}" && SKIP_OK=1
+    grep -qE '\[\[ *-n *"?\$\{?SAMPLE|\[\[ *-z *"?\$\{?SAMPLE|-n *"\$\{SAMPLE\}"' <<< "${BLOB}" && EMPTY_OK=1
+    if (( IDX_OK && SKIP_OK && EMPTY_OK )); then
+        ok "the array index selects the right row, and an out-of-range task is refused"
+    elif (( IDX_OK && SKIP_OK )); then
+        ok "the array index selects the right row"
+        note "nothing checks that the row EXISTS. --array=1-9 against an eight-row sheet
+        gives task 9 an empty sample name, and the pipeline then runs every stage over
+        nothing, succeeds at each, and exits 0. Nine COMPLETED, eight results."
+    elif (( IDX_OK )); then
+        no "the array index selects the right row" \
+           "\$SLURM_ARRAY_TASK_ID is used but nothing skips the header line. Task 1 would
+        read the header as a sample."
+    else
+        no "the array index selects the right row" \
+           "\$SLURM_ARRAY_TASK_ID appears nowhere. It is the only thing that differs
+        between the tasks of an array."
+    fi
+fi
+
+#-- 4 · afterok, and the cohort job must not linger  (15 pts) ----------------
+# Anchored on --dependency rather than on the bare word, because a good script
+# EXPLAINS the choice in a comment -- "afterok, not afterany" -- and an earlier
+# version of this test read that comment and failed the reference solution for
+# using afterany. Grepping source for intent matches the prose about the intent.
+if want "afterok"; then
+    if grep -qE -- '--dependency[=[:space:]]*["'"'"']?afterok' <<< "${BLOB}"; then
+        if grep -q 'kill-on-invalid-dep' <<< "${BLOB}"; then
+            ok "the cohort job depends on array SUCCESS, and will not linger if it fails"
         else
-            SHEET_IS_READ=0
+            ok "the cohort job depends on array SUCCESS (afterok)"
+            note "no --kill-on-invalid-dep. Explorer happens to cancel an unsatisfiable
+        dependency for you; a cluster that does not leaves the job PENDING forever. One
+        flag makes the script right on a machine whose defaults you did not check."
+        fi
+    elif grep -qE -- '--dependency[=[:space:]]*["'"'"']?afterany' <<< "${BLOB}"; then
+        no "the cohort job depends on array SUCCESS (afterok)" \
+           "found 'afterany'. That starts the cohort job when the array FINISHES, however it
+        went. One failed sample then gets you a cohort result over seven samples, with the
+        right shape and the wrong experiment, and nothing says so."
+    else
+        no "the cohort job depends on array SUCCESS (afterok)" \
+           "no --dependency anywhere. Your eight tasks are on eight machines and nothing
+        orders them; the barrier has to be declared."
+    fi
+fi
+
+#-- 5 · the threads you use are the threads you were given  (10 pts) --------
+if want "threads"; then
+    if grep -q 'SLURM_CPUS_PER_TASK' <<< "${BLOB}"; then
+        if grep -qE 'THREADS *= *"?\$\{?SLURM_CPUS_PER_TASK' <<< "${BLOB}"; then
+            ok "the thread count comes from SLURM_CPUS_PER_TASK"
+        else
+            ok "SLURM_CPUS_PER_TASK is used"
+            note "make sure it reaches the tools. A request reserves cores; it does not tell
+        your program anything, and almost every tool defaults to one thread."
+        fi
+    else
+        no "the thread count comes from SLURM_CPUS_PER_TASK" \
+           "not found. --cpus-per-task reserves cores and nothing more. If the number is
+        typed twice you will change one of them one day, and the tool will quietly run on
+        the old count while you hold the new one."
+    fi
+fi
+
+#-- 6 · temp space on the node, and a trap that removes it  (5 pts) ---------
+if want "temp space"; then
+    HAS_TMP=0; HAS_TRAP=0
+    grep -qE 'TMPDIR|/tmp/\$\{?SLURM_JOB_ID|SLURM_TMPDIR' <<< "${BLOB}" && HAS_TMP=1
+    grep -qE 'trap .*(EXIT|SIGTERM)' <<< "${BLOB}" && HAS_TRAP=1
+    if (( HAS_TMP && HAS_TRAP )); then
+        ok "temp space is on the node, and a trap removes it"
+    elif (( HAS_TMP )); then
+        no "temp space is on the node, and a trap removes it" \
+           "the temp space is on the node, but no 'trap ... EXIT' removes it. A rm at the bottom
+        of the script does not run when the job is cancelled or hits its time limit, and /tmp
+        on a compute node is shared with every other job on it."
+    else
+        no "temp space is on the node, and a trap removes it" \
+           "no TMPDIR. samtools sort spills to temporary files beside the output, which is
+        shared storage, and eight tasks write and delete them there for nothing. Point them
+        at /tmp/\$SLURM_JOB_ID and trap it."
+    fi
+fi
+
+#-- 7 · the job does not depend on your shell or your directory  (5 pts) ----
+# Three separate mistakes with the same shape: the job worked because of
+# something outside the job.
+if want "does not depend"; then
+    CLEAN=0; SUBMITDIR=0; LOGDIR=0
+    grep -qE 'export=NONE|--export=NONE|module purge' <<< "${BLOB}" && CLEAN=1
+    grep -q 'SLURM_SUBMIT_DIR' <<< "${BLOB}" && SUBMITDIR=1
+    grep -qE 'mkdir -p +"?\$?\{?[A-Za-z_]*log' <<< "${BLOB}" && LOGDIR=1
+    SCORE=$(( CLEAN + SUBMITDIR + LOGDIR ))
+    if (( SCORE == 3 )); then
+        ok "the job brings its own environment, finds its own config, and has somewhere to log"
+    elif (( SCORE >= 1 )); then
+        no "the job does not depend on your shell or your directory" \
+           "${SCORE} of the 3 are there; all three are needed."
+        (( CLEAN ))     || note "no --export=NONE (or module purge): the job inherits whatever your
+        login shell had, so it works for you and fails for your labmate."
+        (( SUBMITDIR )) || note "no \$SLURM_SUBMIT_DIR: sbatch runs a COPY of your script from
+        /var/spool/slurmd, so \$(dirname \"\$0\") is not your directory and conf/ is not there."
+        (( LOGDIR ))    || note "no 'mkdir -p logs': Slurm will not create the output directory,
+        and a job that cannot open its log fails with nowhere to write why."
+    else
+        no "the job does not depend on your shell or your directory" \
+           "none of --export=NONE, \$SLURM_SUBMIT_DIR, or 'mkdir -p logs'. Each of these is a
+        way the job can work on your account and nowhere else."
+    fi
+fi
+
+#-- 8 · RESOURCES.md — measured, with a decision  (10 pts) ------------------
+if want "RESOURCES"; then
+    RES=""
+    for f in RESOURCES.md BENCHMARK.md; do [[ -f "${REPO}/$f" ]] && RES="${REPO}/$f" && break; done
+    if [[ -z "${RES}" ]]; then
+        no "RESOURCES.md reports what you measured and what you changed" \
+           "not found. One table and two sentences: what you asked for, what seff said it used,
+        and what you set it to."
+    else
+        HAS_NUM=$(grep -coE '[0-9]+(\.[0-9]+)? *(%|GB|G\b|MB|M\b|:[0-9]{2})' "${RES}")
+        HAS_TOOL=0; HAS_CHANGE=0
+        grep -qiE 'seff|sacct|MaxRSS|memory.peak|CPU Eff' "${RES}" && HAS_TOOL=1
+        grep -qiE 'chang|reduc|cut|rais|lower|instead of|down from|so I|therefore' "${RES}" && HAS_CHANGE=1
+        if (( HAS_NUM >= 4 && HAS_TOOL && HAS_CHANGE )); then
+            ok "RESOURCES.md reports what you measured and what you changed"
+        elif (( HAS_NUM >= 2 && HAS_TOOL )); then
+            ok "RESOURCES.md reports measurements"
+            note "it does not say what you CHANGED because of them. The measurement is half the
+        mark; the decision it led to is the other half."
+        else
+            no "RESOURCES.md reports what you measured and what you changed" \
+           "found ${HAS_NUM} numbers and no seff/sacct output. Paste the real output, then say
+        what you set --cpus-per-task, --mem and --time to and why."
         fi
     fi
-    (( SHEET_IS_READ == 1 ))
-}
-NOT_READING='your driver answered a real samplesheet and a samplesheet that does not exist
-        identically, so nothing has shown that stage 0 reads the sheet. This test
-        checks how a sample is HANDLED, and it cannot mean anything until something
-        handles it. Build stage 0 first.'
+fi
 
-# Every shell script in the repo, comments stripped, for the two tests that read
-# code. Layout-agnostic on purpose: the brief lets you start as one file.
-shell_files() {
-    ( cd "${REPO}" && find . -name '*.sh' -not -path './.git/*' -not -path './tests/*' | sort )
-}
-uncommented() {   # uncommented <file> -> the file with # comments removed
-    sed 's/[[:space:]]*#.*$//' "${REPO}/$1"
-}
+#-- 9 · the four deliberate failures  (10 pts) ------------------------------
+# The data is small enough that nothing goes wrong by itself, so the assignment
+# requires you to break it. This test can only check that you wrote the four up;
+# the grader reads whether you diagnosed them.
+if want "deliberate"; then
+    TB=""
+    for f in TROUBLESHOOTING.md FAILURES.md; do [[ -f "${REPO}/$f" ]] && TB="${REPO}/$f" && break; done
+    if [[ -z "${TB}" ]]; then
+        no "TROUBLESHOOTING.md documents the four deliberate failures" \
+           "not found. Four breakages, each a sacct line and two sentences: a --time that is
+        too short, a task that exits 1 under afterok, --array=1-9 on an eight-row sheet, and
+        a scancel mid-write followed by a rerun."
+    else
+        FOUND=0; MISSING=()
+        grep -qiE 'TIMEOUT|--time' "${TB}"                        && FOUND=$(( FOUND+1 )) || MISSING+=("the TIMEOUT")
+        grep -qiE 'afterok|dependency|CANCELLED' "${TB}"           && FOUND=$(( FOUND+1 )) || MISSING+=("the failed task under afterok")
+        # Match the SHAPE, not one cohort's numbers: the demo sheet has 12 rows and
+        # the assignment's has 8, so 'array=1-9' is specific to one of them.
+        grep -qiE 'out.of.range|wider than|no row|no such row|empty sample|exit 64' "${TB}" && FOUND=$(( FOUND+1 )) || MISSING+=("the out-of-range task")
+        grep -qiE 'scancel|partial|truncat|half-writ|gzip -t' "${TB}"  && FOUND=$(( FOUND+1 )) || MISSING+=("the partial file")
+        if (( FOUND == 4 )); then
+            ok "TROUBLESHOOTING.md documents all four deliberate failures"
+        elif (( FOUND >= 2 )); then
+            ok "TROUBLESHOOTING.md documents ${FOUND} of the four deliberate failures"
+            note "missing: ${MISSING[*]}"
+        else
+            no "TROUBLESHOOTING.md documents the four deliberate failures" \
+               "found ${FOUND} of 4. Missing: ${MISSING[*]}"
+        fi
+    fi
+fi
 
-printf '\n%sBINF6610 Assignment 1 — acceptance tests%s\n' "${C_DIM}" "${C_RST}"
-printf '%srepo: %s%s\n' "${C_DIM}" "${REPO}" "${C_RST}"
-printf '%sdriver called as: %s%s\n\n' "${C_DIM}" \
-       "$( [[ "${INVOKE}" == flags ]] && echo './run_pipeline.sh --samplesheet S --outdir D --to validate' \
-                                      || echo './run_pipeline.sh S D validate' )" "${C_RST}"
-
-[[ -f "${REPO}/run_pipeline.sh" ]] || {
-    printf '  %sFAIL%s  run_pipeline.sh not found in %s\n' "${C_BAD}" "${C_RST}" "${REPO}"
-    printf '\n  Nothing else can run without it.\n\n'
-    exit 1
-}
-
-#-- 1 · 20 marks -------------------------------------------------------------
-# Stage 0 reports every problem it finds, together.
-if want everything; then
-    r=$(run_validate "${MANY}" "${WORK}/out-many"); rc=${r%%|*}; out=${r#*|}
-    missed=()
-    for id in BADPATH NOMATE CUTGZIP; do
-        [[ "${out}" == *"${id}"* ]] || missed+=( "${id}" )
+#-- 10 · the whole cohort ran on Explorer  (20 pts) --------------------------
+# Every other test reads your scripts. This one reads what your array and your
+# cohort job produced: the cohort's filtered VCF and the manifest, copied into
+# cluster-run/ and committed.
+#
+# Measured with the course's reference solution on Explorer on 2026-09-22 (array
+# 10535731 and cohort 10535739, about 23 minutes end to end): 36,853 records, all
+# in chr20:1-10 Mb, and 17,518 to 18,782 non-reference genotypes per sample. The
+# bar is 10,000 per sample -- far enough below that for different filtering, far
+# enough above zero to catch a sample that never reached the cohort.
+#
+# A file can be copied, so provenance is part of the check: the manifest must name
+# the Explorer reference, and the commit it records must be in THIS repository's
+# history. The paths GATK wrote into the VCF header are printed for the grader,
+# because they carry the username of whoever ran the jobs.
+COHORT_IDS=(NA12878 NA12891 NA12892 NA07357 NA12003 NA10851 NA12813 NA12873)
+MIN_NONREF=10000
+if want "cluster"; then
+    CVCF=""
+    for cand in cluster-run/cohort.filtered.vcf.gz cluster-run/cohort.filtered.vcf; do
+        [[ -s "${REPO}/${cand}" ]] && { CVCF="${REPO}/${cand}"; break; }
     done
-    if (( rc == 0 )); then
-        no "stage 0 reports every problem together" \
-           "four samples, three of them broken, and stage 0 exited 0. It has to fail."
-    elif (( ${#missed[@]} > 0 )); then
-        no "stage 0 reports every problem together" \
-           "exited ${rc}, but never named: ${missed[*]}. A stage 0 that dies on the first
-        problem costs one run per typo. Collect them, then exit once."
+    CMAN="${REPO}/cluster-run/manifest.json"
+    vcat() { if [[ "${CVCF}" == *.gz ]]; then gzip -dc "${CVCF}"; else cat "${CVCF}"; fi; }
+
+    if [[ -z "${CVCF}" ]]; then
+        no "the whole cohort ran on Explorer" \
+           "no cluster-run/cohort.filtered.vcf.gz in your repository. Run the array and the cohort
+        job, copy the cohort job's filtered VCF and its manifest into cluster-run/, and commit both."
     else
-        ok "stage 0 reports every problem together (exit ${rc})"
-        note 'a missing file, a paired row with no R2, and a corrupt gzip — all three named.'
-    fi
-fi
-
-#-- 2 · 10 marks -------------------------------------------------------------
-# A sample name with a space in it.
-if want name; then
-    if ! sheet_is_read; then
-        no "survives a sample named 'Donor 3-rep1'" "${NOT_READING}"
-    else
-        r=$(run_validate "${WEIRD}" "${WORK}/out-weird"); out=${r#*|}
-        if sample_ok "${out}" 'Donor 3-rep1'; then
-            ok "survives a sample named 'Donor 3-rep1'"
-        else
-            no "survives a sample named 'Donor 3-rep1'" \
-               "an unquoted \$id or \$r1 split on the space. Every expansion needs quotes:
-        \"\$r1\", not \$r1."
-        fi
-    fi
-fi
-
-#-- 3 · 10 marks -------------------------------------------------------------
-# A corrupt gzip stream.
-if want truncated; then
-    r=$(run_validate "${CUT}" "${WORK}/out-cut"); rc=${r%%|*}; out=${r#*|}
-    if (( rc != 0 )) && [[ "${out}" == *NA12891* ]]; then
-        ok "catches a truncated .fastq.gz in stage 0"
-    elif (( rc != 0 )); then
-        no "catches a truncated .fastq.gz in stage 0" \
-           "it failed, but never named NA12891 — say which sample, or nobody can fix it."
-    else
-        no "catches a truncated .fastq.gz in stage 0" \
-           "NA12891's R1 is a gzip stream with its tail cut off and stage 0 accepted it.
-        \`gzip -t\` is the check; the file opens fine and ends in the middle."
-    fi
-fi
-
-#-- 4 · 10 marks -------------------------------------------------------------
-# The same sample_id twice.
-if want duplicate; then
-    r=$(run_validate "${DUP}" "${WORK}/out-dup"); rc=${r%%|*}; out=${r#*|}
-    if (( rc != 0 )) && [[ "${out}" == *NA12878* ]]; then
-        ok "rejects a duplicate sample_id"
-    elif (( rc != 0 )); then
-        no "rejects a duplicate sample_id" \
-           "it failed, but never named NA12878 — an error that does not say which row is
-        wrong is not actionable. Partial credit."
-    else
-        no "rejects a duplicate sample_id" \
-           "NA12878 appears on two rows. Whichever runs second overwrites the first, and
-        the cohort is quietly one sample smaller. The demo does it with
-        \`awk -F, 'NR>1 { print \$1 }' \"\$SHEET\" | sort | uniq -d\`."
-    fi
-fi
-
-#-- 5 · 5 marks --------------------------------------------------------------
-# Single-end decided by the column, not by the name.
-if want single; then
-    if ! sheet_is_read; then
-        no "single-end read from library_type, not from the name" "${NOT_READING}"
-    else
-        r=$(run_validate "${SINGLE}" "${WORK}/out-single"); out=${r#*|}
-        if sample_ok "${out}" NA12878; then
-            ok "single-end read from library_type, not from the name"
-        else
-            no "single-end read from library_type, not from the name" \
-               "NA12878 is single-end HERE and paired in the real cohort. If your code
-        decides from the sample's name it passes on the real sheet and fails on
-        this one. Branch on \$lt."
-        fi
-    fi
-fi
-
-#-- 6 · 5 marks --------------------------------------------------------------
-# set -euo pipefail, read from the code.
-if want strict; then
-    without=()
-    while IFS= read -r f; do
-        [[ -n "${f}" ]] || continue
-        body=$(uncommented "${f}")
-        has_e=0 has_u=0 has_p=0
-        [[ "${body}" =~ set\ -[a-z]*e || "${body}" == *"set -o errexit"*  ]] && has_e=1
-        [[ "${body}" =~ set\ -[a-z]*u || "${body}" == *"set -o nounset"*  ]] && has_u=1
-        [[ "${body}" == *"pipefail"* ]]                                      && has_p=1
-        (( has_e && has_u && has_p )) || without+=( "${f}" )
-    done < <(shell_files)
-
-    if (( ${#without[@]} == 0 )); then
-        ok "set -euo pipefail in every script"
-        note 'read from your code, not proven by killing a run. Necessary, not sufficient.'
-    else
-        no "set -euo pipefail in every script" \
-           "missing -e, -u or pipefail in: ${without[*]}
-        pipefail is the one that matters most here: without it a dead gzip feeding a
-        happy wc gives you a count of 0 and an exit status of 0."
-    fi
-fi
-
-#-- 7 · 5 marks --------------------------------------------------------------
-# Progress to stderr, stdout left clean.
-if want stderr; then
-    if ! sheet_is_read; then
-        no "progress messages go to stderr" "${NOT_READING}"
-    else
-        if [[ "${INVOKE}" == flags ]]; then
-            sout=$( cd "${REPO}" && bash ./run_pipeline.sh --samplesheet "${GOOD}" \
-                      --outdir "${WORK}/out-fd"  --to validate 2>/dev/null )
-            serr=$( cd "${REPO}" && bash ./run_pipeline.sh --samplesheet "${GOOD}" \
-                      --outdir "${WORK}/out-fd2" --to validate 2>&1 >/dev/null )
-        else
-            sout=$( cd "${REPO}" && bash ./run_pipeline.sh "${GOOD}" "${WORK}/out-fd"  validate 2>/dev/null )
-            serr=$( cd "${REPO}" && bash ./run_pipeline.sh "${GOOD}" "${WORK}/out-fd2" validate 2>&1 >/dev/null )
-        fi
-        if [[ -z "${serr//[[:space:]]/}" ]]; then
-            no "progress messages go to stderr" \
-               "stage 0 said nothing at all on stderr. It should report what it checked."
-        elif [[ -n "${sout//[[:space:]]/}" ]]; then
-            no "progress messages go to stderr" \
-               "stdout carried: $(printf '%s' "${sout}" | head -1)
-        Channel 1 is for data a later stage will read. Messages go to channel 2:
-        \`echo \"...\" >&2\`. A VCF with a log line in it is not a VCF."
-        else
-            ok "progress messages go to stderr, stdout stays clean"
-        fi
-    fi
-fi
-
-#-- 8 · 5 marks --------------------------------------------------------------
-# No sample named in the code.
-if want samplesheet; then
-    named=()
-    while IFS= read -r f; do
-        [[ -n "${f}" ]] || continue
-        body=$(uncommented "${f}")
-        for id in NA12878 NA12891 NA12892 NA07357 NA12003 NA10851 NA12813 NA12873; do
-            [[ "${body}" == *"${id}"* ]] && { named+=( "${f}:${id}" ); break; }
-        done
-    done < <(shell_files)
-
-    if (( ${#named[@]} == 0 )); then
-        ok "no sample is named in the code"
-    else
-        no "no sample is named in the code" \
-           "found: ${named[*]}
-        The samplesheet is the only input. Adding a sample or changing a condition
-        must need no change to the code."
-    fi
-fi
-
-#-- 9 · 20 marks -------------------------------------------------------------
-# The whole pipeline, run on the smoke dataset, found the variants planted in it.
-#
-# Every other test here runs stage 0 or reads your code. This one reads the
-# result of your own run of all ten stages: your stage-7 VCF, scored against
-# the answer files wgsim wrote when it planted the variants. A pipeline that
-# stops early has no VCF to hand in, and one that mishandles the single-end
-# sample (smoke_03) loses that sample's column.
-#
-# A planted SNV counts as found when that sample has a non-reference genotype
-# at that position, whatever the FILTER column says. Measured with the course's
-# reference solution on the instructor's 8 GB laptop: 850/850 (100 %),
-# 828/829 (99.9 %) and 798/866 (92.1 %) for the single-end sample, whose reads
-# are about 9x deep. The bar is 80 % per sample.
-SMOKE_MIN_PCT=80
-smoke_calls() {              # smoke_calls <vcf> -> "sample<TAB>pos" per non-reference genotype
-    local vcf=$1
-    { if [[ "${vcf}" == *.gz ]]; then gzip -dc "${vcf}"; else cat "${vcf}"; fi; } 2>/dev/null \
-    | awk -F'\t' '
-        /^##/     { next }
-        /^#CHROM/ { for (i = 10; i <= NF; i++) name[i] = $i; next }
-        {
-            n = split($9, fmt, ":"); g = 0
-            for (k = 1; k <= n; k++) if (fmt[k] == "GT") g = k
-            if (!g) next
-            for (i = 10; i <= NF; i++) {
-                split($i, f, ":")
-                if (f[g] ~ /[1-9]/) print name[i] "\t" $2
+        counts=$(vcat 2>/dev/null | awk -F'\t' '
+            /^##/     { next }
+            /^#CHROM/ { for (i = 10; i <= NF; i++) { name[i] = $i; print "COL " $i }; next }
+            {   total++
+                if ($1 == "chr20" && $2 + 0 >= 1 && $2 + 0 <= 10000000) inwin++
+                n = split($9, fmt, ":"); g = 0
+                for (k = 1; k <= n; k++) if (fmt[k] == "GT") g = k
+                if (!g) next
+                for (i = 10; i <= NF; i++) { split($i, f, ":"); if (f[g] ~ /[1-9]/) nonref[name[i]]++ }
             }
-        }'
-}
-if want smoke; then
-    SVCF=""
-    for cand in smoke-run/cohort.filtered.vcf.gz smoke-run/cohort.filtered.vcf; do
-        [[ -s "${REPO}/${cand}" ]] && { SVCF="${REPO}/${cand}"; break; }
-    done
-    SPROV=""
-    for cand in smoke-run/manifest.json smoke-run/run_info.tsv; do
-        [[ -s "${REPO}/${cand}" ]] && grep -q 'smoke' "${REPO}/${cand}" && { SPROV="${cand}"; break; }
-    done
-
-    if [[ -z "${SVCF}" ]]; then
-        no "the whole pipeline ran on the smoke dataset" \
-           "no smoke-run/cohort.filtered.vcf.gz in your repository. Run all ten stages on the
-        smoke dataset, copy your stage-7 VCF and your stage-9 manifest into smoke-run/,
-        and commit them. The brief shows the three commands."
-    else
-        calls=$(smoke_calls "${SVCF}")
-        header=$( { if [[ "${SVCF}" == *.gz ]]; then gzip -dc "${SVCF}"; else cat "${SVCF}"; fi; } 2>/dev/null \
-                  | awk -F'\t' '/^#CHROM/ { for (i = 10; i <= NF; i++) print $i; exit }')
+            END { for (s in nonref) print "NONREF " s " " nonref[s]
+                  print "TOTAL " total + 0; print "INWIN " inwin + 0 }')
         problems=() found=()
-        for s in smoke_01 smoke_02 smoke_03; do
-            truth="${HERE}/smoke-truth/${s}.truth.txt"
-            if ! grep -qx "${s}" <<< "${header}"; then
-                problems+=( "the VCF has no column for ${s}" )
-                continue
-            fi
-            total=$(awk -F'\t' '$3 != "-" && $4 != "-"' "${truth}" | wc -l | tr -d ' ')
-            hits=$(awk -F'\t' -v s="${s}" 'NR == FNR { if ($1 == s) seen[$2] = 1; next }
-                                           $3 != "-" && $4 != "-" && ($2 in seen)' \
-                       <(printf '%s\n' "${calls}") "${truth}" | wc -l | tr -d ' ')
-            pct=$(( total > 0 ? 100 * hits / total : 0 ))
-            found+=( "${s} ${hits}/${total} (${pct} %)" )
-            (( pct >= SMOKE_MIN_PCT )) || problems+=( "${s} found ${hits} of ${total} planted SNVs (${pct} %)" )
+        for s in "${COHORT_IDS[@]}"; do
+            if ! grep -qx "COL ${s}" <<< "${counts}"; then problems+=( "no column for ${s}" ); continue; fi
+            nr=$(awk -v s="${s}" '$1 == "NONREF" && $2 == s { print $3 }' <<< "${counts}")
+            found+=( "${s} ${nr:-0}" )
+            (( ${nr:-0} >= MIN_NONREF )) || problems+=( "${s} has ${nr:-0} non-reference calls" )
         done
-        [[ -n "${SPROV}" ]] || problems+=( "no smoke-run/manifest.json that names the smoke reference" )
+        total=$(awk '$1 == "TOTAL" { print $2 }' <<< "${counts}")
+        inwin=$(awk '$1 == "INWIN" { print $2 }' <<< "${counts}")
+        (( ${inwin:-0} > 0 )) || problems+=( "no variants in chr20:1-10000000" )
+
+        if [[ ! -s "${CMAN}" ]]; then
+            problems+=( "no cluster-run/manifest.json" )
+        else
+            grep -q 'grch38-1000g' "${CMAN}" || problems+=( "the manifest does not name the Explorer reference" )
+            sha=$(grep -oE '"git_(sha|commit)"[[:space:]]*:[[:space:]]*"[0-9a-f]{7,40}' "${CMAN}" \
+                  | grep -oE '[0-9a-f]{7,40}$' | head -1)
+            if [[ -z "${sha}" ]]; then
+                problems+=( "the manifest records no git commit (run after your first commit)" )
+            elif ! git -C "${REPO}" cat-file -e "${sha}^{commit}" 2>/dev/null; then
+                problems+=( "the manifest's commit ${sha} is not in this repository's history" )
+            fi
+        fi
 
         if (( ${#problems[@]} == 0 )); then
-            ok "the whole pipeline ran on the smoke dataset"
-            note "planted SNVs found: ${found[*]}"
+            ok "the whole cohort ran on Explorer"
+            note "${total} records, ${inwin} in chr20:1-10 Mb; non-reference calls: ${found[*]}"
         else
-            no "the whole pipeline ran on the smoke dataset" \
-               "a VCF is there, so the run finished: partial credit. Still wrong: $(IFS=';'; printf '%s' "${problems[*]}").
-        The bar is ${SMOKE_MIN_PCT} % of each sample's planted SNVs. A missing column usually means the
-        read group's SM is not the sample_id, or the single-end sample never reached the VCF."
+            no "the whole cohort ran on Explorer" \
+               "a VCF is there, so the run finished: partial credit. Still wrong: $(IFS=';'; printf '%s' "${problems[*]}")."
         fi
+        users=$(vcat 2>/dev/null | grep '^##' | grep -oE '/(scratch|home)/[^/ ,"]+' | sort -u | tr '\n' ' ')
+        [[ -n "${users}" ]] && note "paths in the VCF header, for the grader: ${users}"
     fi
 fi
 
-#-- 10 · 10 marks, read by a person ------------------------------------------
-if want troubleshooting; then
-    tfile=""
-    for cand in TROUBLESHOOTING.md troubleshooting.md docs/TROUBLESHOOTING.md; do
-        [[ -f "${REPO}/${cand}" ]] && { tfile="${cand}"; break; }
-    done
-    if [[ -z "${tfile}" ]]; then
-        no "TROUBLESHOOTING.md is present" \
-           "half a page: what broke, how you found it, the fix. It is worth 10 marks and
-        it is the part no automated test can grade."
-    elif (( $(wc -c < "${REPO}/${tfile}") < 200 )); then
-        no "TROUBLESHOOTING.md is present" \
-           "${tfile} is under 200 characters. Marks come from reading it, not from its
-        existence — say what broke, how you found it, and what the fix was."
-    else
-        ok "TROUBLESHOOTING.md is present (${tfile})"
-        note 'the marks for this one come from reading it, not from this check.'
-    fi
-fi
-
-#-----------------------------------------------------------------------------
-printf '\n  %d passed, %d failed\n' "${pass}" "${fail}"
+#-- summary ------------------------------------------------------------------
+printf '\n  %s%d passed%s, %s%d failed%s\n' \
+    "${C_OK}" "${pass}" "${C_RST}" "$( (( fail )) && printf '%s' "${C_BAD}" )" "${fail}" "${C_RST}"
 if (( fail )); then
     printf '\n  failing:\n'
-    for f in "${FAILURES[@]}"; do printf '    - %s\n' "${f}"; done
+    for f in "${FAILURES[@]}"; do printf '    - %s\n' "$f"; done
     printf '\n'
     exit 1
 fi
-printf '\n'
+printf '\n  All ten, including the cohort your cluster run produced.\n\n'

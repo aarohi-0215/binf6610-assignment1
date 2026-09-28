@@ -11,3 +11,6 @@ rnaseq-week1/
 # input dataset (do not commit) and old test backup
 smoke/
 tests_OLD/
+
+# week 2 additions
+tests_w1_backup/
