@@ -54,8 +54,7 @@ records) to 120 bytes; `gzip -t` returned exit 1 ("unexpected end of file") and
 stage_validate named the sample and exited 65.
 
 **Cause / resolution.** Environment-dependent test fixture, not a bug in my code.
-I raised it on the discussion board; the instructor confirmed the fixture was wrong
-and shipped a corrected harness that cuts the file at half its size and asserts the
+The updated harness corrects the fixture: it cuts the file at half its size and asserts the
 fixture is really truncated. With the corrected harness my unchanged pipeline passes
 the truncation test.
 
