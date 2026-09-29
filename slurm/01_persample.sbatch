@@ -8,8 +8,8 @@
 #SBATCH --job-name=vc-persample
 #SBATCH --partition=short
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=12G
-#SBATCH --time=02:00:00
+#SBATCH --mem=24G
+#SBATCH --time=00:30:00
 #SBATCH --output=logs/persample_%A_%a.out
 #SBATCH --error=logs/persample_%A_%a.err
 #SBATCH --export=NONE

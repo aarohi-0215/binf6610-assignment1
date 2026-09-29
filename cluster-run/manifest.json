@@ -1,0 +1,22 @@
+{
+  "pipeline": {
+    "name": "variant-call",
+    "version": "1.0.0",
+    "implementation": "bash",
+    "git_sha": "a46e6f6",
+    "run_id": "2026-09-29T01:43:27Z-3806703",
+    "started_at": "2026-09-29T01:43:27Z",
+    "finished_at": "2026-09-29T01:51:22Z",
+    "exit_status": "success"
+  },
+  "platform": {
+    "kind": "laptop",
+    "region": "chr20:1-10000000"
+  },
+  "reference": {
+    "genome": "/courses/BINF6610.202710/data/refs/grch38-1000g/GRCh38_full_analysis_set_plus_decoy_hla.fa"
+  },
+  "samples": [ {"sample_id":"NA12878","library_type":"paired","condition":"affected"},{"sample_id":"NA12891","library_type":"paired","condition":"affected"},{"sample_id":"NA12892","library_type":"single","condition":"unaffected"},{"sample_id":"NA07357","library_type":"paired","condition":"unaffected"},{"sample_id":"NA12003","library_type":"single","condition":"affected"},{"sample_id":"NA10851","library_type":"paired","condition":"unaffected"},{"sample_id":"NA12813","library_type":"paired","condition":"affected"},{"sample_id":"NA12873","library_type":"paired","condition":"unaffected"} ],
+  "outputs": [ {"stage":"analyze","type":"cohort_vcf","path":"cohort.filtered.vcf.gz","checksum":"sha256:9c942b6a9292317626cd74f937ea272838a0a9f221b7247ade6a6792e90bf718"},{"stage":"qc_report","type":"multiqc","path":"multiqc_report.html","checksum":"sha256:e81ce6aff18470d6840356c3ee0da206303d6a4b056e28ec36b08a6023cdbd64"} ],
+  "metrics": [ {"metric":"n_variants_total","value":36853,"stage":"merge"},{"metric":"n_variants_pass","value":36078,"stage":"analyze"} ]
+}
