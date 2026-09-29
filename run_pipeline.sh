@@ -260,6 +260,8 @@ stage_merge() {
     gatk GenomicsDBImport \
         ${vargs} \
         -L "$REGION" \
+        --batch-size 8 \
+        --reader-threads "${THREADS:-4}" \
         --genomicsdb-workspace-path "$dbdir" \
         >>"${dir}/genomicsdbimport.log" 2>&1
 
