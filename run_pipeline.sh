@@ -246,7 +246,12 @@ _collect_gvcf_args() {
 }
 stage_merge() {
     local dir="${OUT}/merge"; mkdir -p "$dir"
-    local dbdir="${dir}/genomicsdb"
+    # Build the GenomicsDB workspace on node-local temp (fast) rather than on
+    # shared storage. GenotypeGVCFs reads it immediately in this same job, so it
+    # never needs to persist — and the many small writes GenomicsDBImport makes
+    # are far faster on a local disk than over shared /home. TMPDIR is set (and
+    # trap-cleaned) by the batch script; fall back to /tmp for a plain run.
+    local dbdir="${TMPDIR:-/tmp}/genomicsdb.$$"
     local cohort="${dir}/cohort.vcf.gz"
 
     # GenomicsDBImport needs a fresh (non-existent) workspace directory.
