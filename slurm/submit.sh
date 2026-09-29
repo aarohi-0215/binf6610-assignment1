@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #=============================================================================
-# submit.sh — fire the array, then the cohort job gated on the array SUCCEEDING.
+# submit.sh: fire the array, then the cohort job gated on the array SUCCEEDING.
 # Two sbatch calls and one dependency. Run this from the repo root on Explorer.
 #=============================================================================
 
@@ -20,7 +20,7 @@ printf 'submitting array of %s samples\n' "${N}" >&2
 ARRAY_ID=$(sbatch --parsable --array=1-"${N}" slurm/01_persample.sbatch)
 printf 'array job: %s\n' "${ARRAY_ID}" >&2
 
-# 2) the cohort job — afterok (not afterany): runs only if EVERY task succeeded.
+# 2) the cohort job, gated on afterok (not afterany), runs only if EVERY task succeeded.
 #    --kill-on-invalid-dep=yes so it cannot linger PENDING on a cluster whose
 #    default does not auto-cancel an unsatisfiable dependency.
 COHORT_ID=$(sbatch --parsable \

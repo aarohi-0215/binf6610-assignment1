@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #=============================================================================
-# 01_persample.sbatch — stages 0-5 for ONE sample, as one task of an array.
+# 01_persample.sbatch: stages 0-5 for ONE sample, as one task of an array.
 # Submitted with --array=1-N; task K processes row K of the samplesheet.
 # Contains NO bioinformatics tool calls: it decides WHICH sample runs and with
 # what resources; run_sample.sh -> run_pipeline.sh does the analysis.
@@ -46,7 +46,7 @@ SAMPLE=$(awk -F',' -v n="${SLURM_ARRAY_TASK_ID}" 'NR == n + 1 { print $1 }' "${S
 # An array wider than the sheet hands a task an empty sample name; a pipeline
 # given no sample would succeed at every stage over nothing and exit 0. Refuse.
 if [[ -z "${SAMPLE}" ]]; then
-    printf 'task %s: no row %s in %s — out-of-range array index, refusing.\n' \
+    printf 'task %s: no row %s in %s (out-of-range array index), refusing.\n' \
         "${SLURM_ARRAY_TASK_ID}" "$(( SLURM_ARRAY_TASK_ID + 1 ))" "${SAMPLESHEET}" >&2
     exit 65
 fi

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #=============================================================================
-# run_sample.sh — the per-sample entry point.
+# run_sample.sh: the per-sample entry point.
 #
 # An array task runs ONE sample; run_pipeline.sh runs all of them. Both call
-# the SAME stage functions — this wrapper just feeds run_pipeline.sh a
+# the SAME stage functions: this wrapper just feeds run_pipeline.sh a
 # one-row samplesheet and stops after stage 5 (quantify).
 #
 # It DECLINES the cohort stages (6-9: merge, analyze, qc_report, publish) on

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #=============================================================================
-# 02_cohort.sbatch — stages 6-9, ONCE, after every array task has SUCCEEDED.
+# 02_cohort.sbatch: stages 6-9, ONCE, after every array task has SUCCEEDED.
 # The barrier: submitted with --dependency=afterok on the array, so it only
 # runs if all samples finished. Contains NO bioinformatics tool calls.
 #=============================================================================

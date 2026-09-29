@@ -1,4 +1,4 @@
-# TROUBLESHOOTING.md — Assignment 2 (job array on Explorer)
+# TROUBLESHOOTING.md: Assignment 2 (job array on Explorer)
 
 **Use of AI assistance.** I used an AI assistant (Claude) to help scaffold the
 Slurm scripts and to reason about failures. Every job below was submitted by me
@@ -68,7 +68,7 @@ JobID             State    Elapsed ExitCode
 ```
 
 **What task 9 did.** It found no row 10 in the sheet and exited 65 in 10 seconds,
-with `task 9: no row 10 in samplesheet.cluster.csv — out-of-range array index, refusing.`
+with `task 9: no row 10 in samplesheet.cluster.csv (out-of-range array index), refusing.`
 That is the `[[ -z "${SAMPLE}" ]]` guard in `01_persample.sbatch`.
 
 **What it would have done without the guard.** `SAMPLE` would be empty and

@@ -1,4 +1,4 @@
-# RESOURCES.md — what I asked for, what I measured, what I set
+# RESOURCES.md: what I asked for, what I measured, what I set
 
 Explorer, partition `short`, the eight-sample cohort (`chr20:1-10,000,000`),
 course conda environment. Every number below is from `sacct` or from a timed run
@@ -68,7 +68,7 @@ $ sacct -j 10673145,10673146,10673147,10673148 --format=JobID,State,Elapsed,Tota
 
 | --cpus-per-task | wall (s) | vs. previous | CPU time |
 |---|---|---|---|
-| 2  | 759 | —          | 19:48 |
+| 2  | 759 | baseline | 19:48 |
 | 4  | 705 | 7% faster  | 30:46 |
 | 8  | 477 | 32% faster | 21:56 |
 | 16 | 463 | 3% faster  | 27:55 |
