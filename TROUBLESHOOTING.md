@@ -3,7 +3,7 @@
 **Use of AI assistance.** I used an AI assistant (Claude) to help scaffold the
 Slurm scripts and to reason about failures. Every job below was submitted by me
 on Explorer, and every sacct line is pasted from my own terminal. The Assignment 1
-log is on the `main` branch.
+log is on the `master` branch.
 
 The cohort data is small enough that nothing breaks on its own, so I broke the
 pipeline four times on purpose. The throwaway scripts for these lived in `ts/` on
