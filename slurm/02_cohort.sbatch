@@ -32,6 +32,7 @@ trap 'rm -rf "${TMPDIR}"' EXIT
 
 # Run the full pipeline: stages 0-5 are already done and their outputs exist in
 # OUTDIR, so the cohort stages 6-9 (merge, analyze, qc_report, publish) run over
-# all samples. run_pipeline.sh with no last-stage runs through publish.
+# all samples. Passing "publish merge" runs stages 6-9 only (FIRST=merge,
+# LAST=publish), reusing the per-sample GVCFs the array already produced.
 printf 'cohort: joint-genotyping and publishing across all samples\n' >&2
-bash "${REPO}/run_pipeline.sh" "${SAMPLESHEET}" "${OUTDIR}"
+bash "${REPO}/run_pipeline.sh" "${SAMPLESHEET}" "${OUTDIR}" publish merge

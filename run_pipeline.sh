@@ -10,6 +10,7 @@ set -euo pipefail
 SHEET=${1:?usage: run_pipeline.sh <samplesheet.csv> <outdir> [last-stage]}
 OUT=${2:?usage: run_pipeline.sh <samplesheet.csv> <outdir> [last-stage]}
 LAST=${3:-publish}
+FIRST=${4:-validate}   # first stage to run (default: from the start)
 
 # Load configuration if present (defaults live inside the file).
 CONF="$(dirname "$0")/conf/pipeline.env"
@@ -401,10 +402,14 @@ JSON
 # The driver — run stages in order, stop after the one named in LAST.
 #=============================================================================
 n=0
+started=0
 for stage in "${STAGES[@]}"; do
-    log "===== stage ${n} : ${stage} ====="
-    "stage_${stage}"
-    [[ "$stage" == "$LAST" ]] && break
+    [[ "$stage" == "$FIRST" ]] && started=1
+    if (( started )); then
+        log "===== stage ${n} : ${stage} ====="
+        "stage_${stage}"
+        [[ "$stage" == "$LAST" ]] && break
+    fi
     n=$(( n + 1 ))
 done
 log "done"
