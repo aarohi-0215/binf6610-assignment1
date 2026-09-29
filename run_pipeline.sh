@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #=============================================================================
-# run_pipeline.sh — germline variant-calling pipeline (Week 1, Bash)
+# run_pipeline.sh: germline variant-calling pipeline (Week 1, Bash)
 #
 # Usage:  ./run_pipeline.sh <samplesheet.csv> <outdir> [last-stage]
 #=============================================================================
@@ -26,12 +26,12 @@ RUN_ID="$(date -u +%Y-%m-%dT%H:%M:%SZ)-$$"
 STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 #-----------------------------------------------------------------------------
-# log() — status to stderr (channel 2). stdout (channel 1) is for DATA only.
+# log(): status to stderr (channel 2). stdout (channel 1) is for DATA only.
 #-----------------------------------------------------------------------------
 log() { printf '%s\n' "$*" >&2; }
 
 #-----------------------------------------------------------------------------
-# read_samples CALLBACK — call CALLBACK once per data row of the samplesheet,
+# read_samples CALLBACK: call CALLBACK once per data row of the samplesheet,
 # passing: sample_id condition replicate library_type r1 r2
 # Uses < <(...) not a pipe, so the caller's variables survive (see stage 0).
 #-----------------------------------------------------------------------------
@@ -46,7 +46,7 @@ read_samples() {
 STAGES=(validate qc_raw trim align postprocess quantify merge analyze qc_report publish)
 
 #=============================================================================
-# Stage 0 — validate. Check the samplesheet and every input BEFORE any compute.
+# Stage 0: validate. Check the samplesheet and every input BEFORE any compute.
 # Golden rule: collect EVERY problem into an array, report them all, fail once.
 #=============================================================================
 stage_validate() {
@@ -109,7 +109,7 @@ stage_validate() {
 }
 
 #=============================================================================
-# Stage 1 — qc_raw. FastQC on every raw FASTQ. Per-sample.
+# Stage 1: qc_raw. FastQC on every raw FASTQ. Per-sample.
 #=============================================================================
 _qc_one() {
     local id=$1 lib=$4 r1=$5 r2=$6
@@ -129,7 +129,7 @@ _qc_one() {
 stage_qc_raw() { read_samples _qc_one; }
 
 #=============================================================================
-# Stage 2 — trim. fastp: remove adapters and low-quality tails. Branch on layout.
+# Stage 2: trim. fastp removes adapters and low-quality tails. Branch on layout.
 #=============================================================================
 _trim_one() {
     local id=$1 lib=$4 r1=$5 r2=$6
@@ -153,7 +153,7 @@ _trim_one() {
 stage_trim() { read_samples _trim_one; }
 
 #=============================================================================
-# Stage 3 — align. BWA-MEM -> samtools sort -> coordinate-sorted BAM.
+# Stage 3: align. BWA-MEM -> samtools sort -> coordinate-sorted BAM.
 # The read group's SM tag MUST equal the sample_id: GATK reads it to name the
 # VCF column, and the smoke test matches columns to truth files by that name.
 #=============================================================================
@@ -183,7 +183,7 @@ _align_one() {
 stage_align() { read_samples _align_one; }
 
 #=============================================================================
-# Stage 4 — postprocess. Mark duplicates, then index the BAM.
+# Stage 4: postprocess. Mark duplicates, then index the BAM.
 #=============================================================================
 _postprocess_one() {
     local id=$1
@@ -208,7 +208,7 @@ _postprocess_one() {
 stage_postprocess() { read_samples _postprocess_one; }
 
 #=============================================================================
-# Stage 5 — quantify. Per-sample variant calling into a GVCF, restricted to
+# Stage 5: quantify. Per-sample variant calling into a GVCF, restricted to
 # REGION. GVCF mode (-ERC GVCF) records reference confidence at every position
 # so stage 6 can joint-genotype across all samples.
 #=============================================================================
@@ -235,7 +235,7 @@ _quantify_one() {
 stage_quantify() { read_samples _quantify_one; }
 
 #=============================================================================
-# Stage 6 — merge. The barrier: cannot start until every sample's GVCF exists.
+# Stage 6: merge. The barrier: cannot start until every sample's GVCF exists.
 # GenomicsDBImport combines the per-sample GVCFs; GenotypeGVCFs joint-genotypes
 # them into one multi-sample cohort VCF (one column per sample).
 #=============================================================================
@@ -278,7 +278,7 @@ stage_merge() {
 }
 
 #=============================================================================
-# Stage 7 — analyze. Hard-filter the cohort VCF with GATK VariantFiltration.
+# Stage 7: analyze. Hard-filter the cohort VCF with GATK VariantFiltration.
 # Flags (does not delete) variants failing standard GATK germline thresholds.
 # Output cohort.filtered.vcf.gz is one of the two files you submit.
 #=============================================================================
@@ -305,7 +305,7 @@ stage_analyze() {
 }
 
 #=============================================================================
-# Stage 8 — qc_report. MultiQC aggregates the tool logs into one HTML report.
+# Stage 8: qc_report. MultiQC aggregates the tool logs into one HTML report.
 # Uses $MULTIQC (from conf) so no tool path is baked into the stage.
 #=============================================================================
 stage_qc_report() {
@@ -318,7 +318,7 @@ stage_qc_report() {
 }
 
 #=============================================================================
-# Stage 9 — publish. Copy the contract outputs to results/ and write
+# Stage 9: publish. Copy the contract outputs to results/ and write
 # manifest.json (validated against tests/manifest.schema.json).
 #=============================================================================
 _sha256() { printf 'sha256:%s' "$(sha256sum "$1" | cut -d' ' -f1)"; }
@@ -398,7 +398,7 @@ JSON
 }
 
 #=============================================================================
-# The driver — run stages in order, stop after the one named in LAST.
+# The driver: run stages in order, stop after the one named in LAST.
 #=============================================================================
 n=0
 for stage in "${STAGES[@]}"; do

@@ -1,4 +1,4 @@
-# Troubleshooting log — Assignment 1
+# Troubleshooting log: Assignment 1
 
 **Use of AI assistance.** I used an AI assistant (Claude) in this
 assignment: to scaffold the ten-stage pipeline structure, explain tool flags and
@@ -13,7 +13,7 @@ problem, confirmed by reading tool output and re-running the acceptance tests.
 together": four samples, three broken, but my stage 0 exited 0.
 
 **How I found it.** The harness said stage 0 exited 0 on known-bad input. Re-reading
-`stage_validate()`, I saw it only checked for duplicate sample_ids — it never opened
+`stage_validate()`, I saw it only checked for duplicate sample_ids: it never opened
 or tested the FASTQ files, so missing files and a corrupt gzip were invisible.
 
 **Cause.** Incomplete validation: no per-file existence/size/integrity checks.
@@ -27,7 +27,7 @@ message to the `problems` array on any failure so all problems report at once.
 
 **Symptom.** A `.fastq.gz` with its tail cut off was accepted by an early stage 0.
 
-**How I found it.** A plain `-f` existence check passed it — the file is present and
+**How I found it.** A plain `-f` existence check passed it: the file is present and
 non-empty; the damage only shows when you decompress the whole stream.
 
 **Cause.** `-f`/`-s` look at presence and size, not contents. A gzip file can be
@@ -45,7 +45,7 @@ truncation test, saying stage 0 accepted the cut file.
 
 **How I found it.** I reproduced the fixture builder from the harness: it made a
 gzip of 20 records, then `head -c 120` on it. On my system (WSL, gzip 1.10) those
-20 records compress to 109 bytes, so `head -c 120` copies the whole file — `cmp`
+20 records compress to 109 bytes, so `head -c 120` copies the whole file. `cmp`
 showed the "cut" file was byte-identical to the original, and both decompressed to
 80 lines. `gzip -t` correctly returned 0 because nothing was truncated.
 
@@ -67,7 +67,7 @@ error was `ValueError: numpy.dtype size changed, may indicate binary
 incompatibility. Expected 96 from C header, got 88`. The apt MultiQC 1.12 was built
 against an older NumPy ABI; the system has NumPy 2.2.6, so MultiQC crashed on import.
 
-**Cause.** Version conflict between the apt MultiQC and the system NumPy — the kind
+**Cause.** Version conflict between the apt MultiQC and the system NumPy: the kind
 of environment drift containers (week 3) are meant to eliminate.
 
 **Fix.** Installed `multiqc==1.21` in an isolated Python venv so it uses a
@@ -81,8 +81,8 @@ the pipeline finished all ten stages.
 
 **How I found it.** I read the test: it scans every `.sh` file (excluding `.git` and
 `tests/`) for any of the eight cohort IDs. Running that same `find`, I saw two stray
-`.sh` files still in the repo — the demo pipeline (`rnaseq-week1/rnaseq.sh`) and a
-backup of the old tests (`tests_OLD/run_acceptance.sh`) — both full of cohort IDs.
+`.sh` files still in the repo: the demo pipeline (`rnaseq-week1/rnaseq.sh`) and a
+backup of the old tests (`tests_OLD/run_acceptance.sh`), both full of cohort IDs.
 
 **Cause.** Leftover files, not my pipeline. My `run_pipeline.sh` never names a
 sample; the IDs live only in `samplesheet.csv`, which the test does not scan.
