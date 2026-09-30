@@ -2,21 +2,47 @@
   "pipeline": {
     "name": "variant-call",
     "version": "1.0.0",
-    "implementation": "bash",
-    "git_sha": "a46e6f6",
-    "run_id": "2026-09-29T01:43:27Z-3806703",
-    "started_at": "2026-09-29T01:43:27Z",
-    "finished_at": "2026-09-29T01:51:22Z",
+    "implementation": "slurm",
+    "git_sha": "031cbdd8665c48cda2c4a6245657280cc84035d5",
+    "run_id": "2026-09-30T18:11:10Z-031cbdd",
+    "started_at": "2026-09-30T18:11:10Z",
+    "finished_at": "2026-09-30T18:18:46Z",
     "exit_status": "success"
   },
   "platform": {
-    "kind": "laptop",
-    "region": "chr20:1-10000000"
+    "kind": "slurm",
+    "region": "chr20:1-10000000",
+    "host": "c0584",
+    "slurm_job_id": "10708998",
+    "slurm_cpus": "2",
+    "container": "none"
   },
-  "reference": {
-    "genome": "/courses/BINF6610.202710/data/refs/grch38-1000g/GRCh38_full_analysis_set_plus_decoy_hla.fa"
-  },
-  "samples": [ {"sample_id":"NA12878","library_type":"paired","condition":"affected"},{"sample_id":"NA12891","library_type":"paired","condition":"affected"},{"sample_id":"NA12892","library_type":"single","condition":"unaffected"},{"sample_id":"NA07357","library_type":"paired","condition":"unaffected"},{"sample_id":"NA12003","library_type":"single","condition":"affected"},{"sample_id":"NA10851","library_type":"paired","condition":"unaffected"},{"sample_id":"NA12813","library_type":"paired","condition":"affected"},{"sample_id":"NA12873","library_type":"paired","condition":"unaffected"} ],
-  "outputs": [ {"stage":"analyze","type":"cohort_vcf","path":"cohort.filtered.vcf.gz","checksum":"sha256:9c942b6a9292317626cd74f937ea272838a0a9f221b7247ade6a6792e90bf718"},{"stage":"qc_report","type":"multiqc","path":"multiqc_report.html","checksum":"sha256:e81ce6aff18470d6840356c3ee0da206303d6a4b056e28ec36b08a6023cdbd64"} ],
-  "metrics": [ {"metric":"n_variants_total","value":36853,"stage":"merge"},{"metric":"n_variants_pass","value":36078,"stage":"analyze"} ]
+  "reference": {"genome": "/courses/BINF6610.202710/data/refs/grch38-1000g/GRCh38_full_analysis_set_plus_decoy_hla.fa"},
+  "samples": [
+    {"sample_id": "NA12878", "library_type": "paired", "condition": "affected"},
+    {"sample_id": "NA12891", "library_type": "paired", "condition": "affected"},
+    {"sample_id": "NA12892", "library_type": "single", "condition": "unaffected"},
+    {"sample_id": "NA07357", "library_type": "paired", "condition": "unaffected"},
+    {"sample_id": "NA12003", "library_type": "single", "condition": "affected"},
+    {"sample_id": "NA10851", "library_type": "paired", "condition": "unaffected"},
+    {"sample_id": "NA12813", "library_type": "paired", "condition": "affected"},
+    {"sample_id": "NA12873", "library_type": "paired", "condition": "unaffected"}
+  ],
+  "outputs": [
+    {"stage": "analyze", "type": "vcf", "path": "cohort.filtered.vcf.gz", "checksum": "sha256:3b781fbbbe9d73870d2502aa0657da7016eb3c21345bc12482ae35961bade150"},
+    {"stage": "analyze", "type": "vcf_index", "path": "cohort.filtered.vcf.gz.tbi", "checksum": "sha256:689e8303eb752bda27115fe36b357baff638a89cf25ec23b8f2c95199a7661f5"},
+    {"stage": "qc_report", "type": "multiqc", "path": "multiqc_report.html", "checksum": "sha256:af16c2dac78fc861c7ed400fe5c63ae444cd174c0d8d4e6c07be46cf47d2f466"}
+  ],
+  "metrics": [],
+  "tools": {
+    "bwa": "0.7.19-r1273",
+    "samtools": "1.24",
+    "bcftools": "1.24",
+    "gatk": "4.6.2.0",
+    "fastqc": "0.12.1",
+    "fastp": "1.3.7",
+    "multiqc": "1.35",
+    "hisat2": "2.2.3",
+    "featureCounts": "2.1.1"
+  }
 }
