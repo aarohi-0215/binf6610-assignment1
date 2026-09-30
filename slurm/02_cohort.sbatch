@@ -21,8 +21,6 @@ source "${REPO}/slurm/conf/slurm.env"
 
 mkdir -p logs
 
-module load "${CONDA_MODULE}"
-source activate "${CONDA_ENV}"
 
 export THREADS="${SLURM_CPUS_PER_TASK}"
 
@@ -35,4 +33,13 @@ trap 'rm -rf "${TMPDIR}"' EXIT
 # all samples. Passing "publish merge" runs stages 6-9 only (FIRST=merge,
 # LAST=publish), reusing the per-sample GVCFs the array already produced.
 printf 'cohort: joint-genotyping and publishing across all samples\n' >&2
-bash "${REPO}/run_pipeline.sh" "${SAMPLESHEET}" "${OUTDIR}" publish merge
+apptainer exec --cleanenv \
+    --env THREADS="${THREADS}" \
+    --env TMPDIR="${TMPDIR}" \
+    --env SLURM_JOB_ID="${SLURM_JOB_ID}" \
+    --env SLURM_CPUS_PER_TASK="${SLURM_CPUS_PER_TASK}" \
+    --env REF="${REF}" \
+    --env REGION="${REGION}" \
+    --bind "/courses/BINF6610.202710,${SCRATCH_DIR}" \
+    "${SIF}" \
+    bash "${REPO}/run_pipeline.sh" "${SAMPLESHEET}" "${OUTDIR}" publish merge

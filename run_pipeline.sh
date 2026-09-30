@@ -6,6 +6,8 @@
 #=============================================================================
 
 set -euo pipefail
+HERE=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+export RUN_STARTED=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
 SHEET=${1:?usage: run_pipeline.sh <samplesheet.csv> <outdir> [last-stage]}
 OUT=${2:?usage: run_pipeline.sh <samplesheet.csv> <outdir> [last-stage]}
@@ -329,77 +331,16 @@ stage_qc_report() {
 # Stage 9: publish. Copy the contract outputs to results/ and write
 # manifest.json (validated against tests/manifest.schema.json).
 #=============================================================================
-_sha256() { printf 'sha256:%s' "$(sha256sum "$1" | cut -d' ' -f1)"; }
-
 stage_publish() {
     local rdir="${OUT}/results"; mkdir -p "$rdir"
     local filtered="${OUT}/analyze/cohort.filtered.vcf.gz"
     local multiqc="${OUT}/qc_report/multiqc_report.html"
 
-    # Publish the contract artifacts into results/.
     cp "$filtered"       "${rdir}/cohort.filtered.vcf.gz"
     cp "${filtered}.tbi" "${rdir}/cohort.filtered.vcf.gz.tbi" 2>/dev/null || true
     [[ -f "$multiqc" ]] && cp "$multiqc" "${rdir}/multiqc_report.html"
 
-    # git sha (why the first commit matters). -dirty if uncommitted changes.
-    local sha
-    sha="$(git -C "$(dirname "$0")" rev-parse --short=7 HEAD 2>/dev/null || echo unknown)"
-    if ! git -C "$(dirname "$0")" diff --quiet 2>/dev/null; then
-        sha="${sha}-dirty"
-    fi
-
-    local finished_at; finished_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-
-    # --- samples[] built from the samplesheet (no names in code) ------------
-    local samples_json="" first=1
-    _sample_json() {
-        local id=$1 cond=$2 lib=$4
-        local sep=""; [[ $first -eq 0 ]] && sep=","; first=0
-        samples_json+="${sep}{\"sample_id\":\"${id}\",\"library_type\":\"${lib}\",\"condition\":\"${cond}\"}"
-    }
-    read_samples _sample_json
-
-    # --- outputs[] : published artifacts, each with a real checksum ----------
-    local vcf_sum; vcf_sum="$(_sha256 "${rdir}/cohort.filtered.vcf.gz")"
-    local outputs_json="{\"stage\":\"analyze\",\"type\":\"cohort_vcf\",\"path\":\"cohort.filtered.vcf.gz\",\"checksum\":\"${vcf_sum}\"}"
-    if [[ -f "${rdir}/multiqc_report.html" ]]; then
-        local mq_sum; mq_sum="$(_sha256 "${rdir}/multiqc_report.html")"
-        outputs_json+=",{\"stage\":\"qc_report\",\"type\":\"multiqc\",\"path\":\"multiqc_report.html\",\"checksum\":\"${mq_sum}\"}"
-    fi
-
-    # --- metrics[] : numeric metrics ----------------------------------------
-    local n_total n_pass
-    n_total="$(zcat "$filtered" | grep -vc '^#' || true)"
-    n_pass="$(zcat "$filtered" | awk -F'\t' '!/^#/ && $7=="PASS"' | wc -l || true)"
-    local metrics_json
-    metrics_json="{\"metric\":\"n_variants_total\",\"value\":${n_total:-0},\"stage\":\"merge\"},"
-    metrics_json+="{\"metric\":\"n_variants_pass\",\"value\":${n_pass:-0},\"stage\":\"analyze\"}"
-
-    # --- assemble manifest.json ---------------------------------------------
-    cat > "${rdir}/manifest.json" <<JSON
-{
-  "pipeline": {
-    "name": "variant-call",
-    "version": "1.0.0",
-    "implementation": "bash",
-    "git_sha": "${sha}",
-    "run_id": "${RUN_ID}",
-    "started_at": "${STARTED_AT}",
-    "finished_at": "${finished_at}",
-    "exit_status": "success"
-  },
-  "platform": {
-    "kind": "laptop",
-    "region": "${REGION}"
-  },
-  "reference": {
-    "genome": "${REF}"
-  },
-  "samples": [ ${samples_json} ],
-  "outputs": [ ${outputs_json} ],
-  "metrics": [ ${metrics_json} ]
-}
-JSON
+    bash "${HERE}/lib/write_manifest.sh" "${rdir}" "${SHEET}" "${REF}" "${REGION}"
 
     [[ -s "${rdir}/manifest.json" ]] || { log "publish: manifest not written"; return 1; }
     log "publish: OK -> ${rdir}/cohort.filtered.vcf.gz , ${rdir}/manifest.json"

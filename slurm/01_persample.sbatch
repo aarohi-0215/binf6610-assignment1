@@ -27,9 +27,6 @@ source "${REPO}/slurm/conf/slurm.env"
 # with nowhere to say why.
 mkdir -p logs
 
-# Bring the analysis tools in (they live in the conda env, not as modules).
-module load "${CONDA_MODULE}"
-source activate "${CONDA_ENV}"
 
 # Threads come from what Slurm actually gave us, never a number we typed.
 export THREADS="${SLURM_CPUS_PER_TASK}"
@@ -54,4 +51,13 @@ fi
 printf 'task %s -> sample %s\n' "${SLURM_ARRAY_TASK_ID}" "${SAMPLE}" >&2
 
 # Run stages 0-5 for this one sample. run_sample.sh declines the cohort stages.
-bash "${REPO}/run_sample.sh" "${SAMPLESHEET}" "${SAMPLE}" "${OUTDIR}"
+apptainer exec --cleanenv \
+    --env THREADS="${THREADS}" \
+    --env TMPDIR="${TMPDIR}" \
+    --env SLURM_JOB_ID="${SLURM_JOB_ID}" \
+    --env SLURM_CPUS_PER_TASK="${SLURM_CPUS_PER_TASK}" \
+    --env REF="${REF}" \
+    --env REGION="${REGION}" \
+    --bind "/courses/BINF6610.202710,${SCRATCH_DIR}" \
+    "${SIF}" \
+    bash "${REPO}/run_sample.sh" "${SAMPLESHEET}" "${SAMPLE}" "${OUTDIR}"
