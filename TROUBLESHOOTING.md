@@ -1,141 +1,90 @@
-# TROUBLESHOOTING.md: Assignment 2 (job array on Explorer)
+# TROUBLESHOOTING.md: Assignment 2 (the pipeline as a job array)
 
-**Use of AI assistance.** I used an AI assistant (Claude) to help scaffold the
-Slurm scripts and to reason about failures. Every job below was submitted by me
-on Explorer, and every sacct line is pasted from my own terminal. The Assignment 1
-log is on the `master` branch.
+**Use of AI assistance.** I used an AI assistant (Claude) to help understand the Slurm scripts and to reason about the failures below. Every `sacct` line and log line is pasted from my terminal.
 
-The cohort data is small enough that nothing breaks on its own, so I broke the
-pipeline four times on purpose. The throwaway scripts for these lived in `ts/` on
-Explorer; they are not part of the pipeline and are not committed.
+The data is small enough that nothing fails by itself, so I broke the current pipeline four times on purpose. Each breakage used a copy of `slurm/01_persample.sbatch` or `slurm/02_cohort.sbatch` kept in `~/w2ts` on Explorer, outside the repository, and each wrote to its own folder under `/scratch`, so the submitted run in `/scratch/<user>/w2-run` was never touched. All were submitted from `slurm/` with `-p courses -A binf6610.202710`.
 
----
+## 1. `--time=00:02:00` → TIMEOUT
 
-## 1. A `--time` that is too short → TIMEOUT
-
-**Broke it.** One per-sample task (NA12878) with `--time=00:02:00`. A full
-sample takes about 8 minutes.
+**Command.** The per-sample script with `--time=00:02:00`, one sample (NA12878), which needs about 8 minutes:
 
 ```
-JobID             State    Elapsed ExitCode     MaxRSS
-10672029_1      TIMEOUT   00:02:21      0:0
-10672029_1.+  CANCELLED   00:02:22     0:15  12914972K
+sbatch -p courses -A binf6610.202710 --array=1 ~/w2ts/break1-timeout.sbatch
 ```
 
-**Where it stopped.** The log ran through validate, qc_raw and trim, printed
-`===== stage 3 : align =====`, and ended with
-`slurmstepd: error: *** JOB 10672029 ON c0672 CANCELLED AT 2026-09-28T20:14:51 DUE TO TIME LIMIT ***`.
-
-**What was left on disk.** `qc_raw/` reports and both trimmed FASTQs, and in
-`align/` only `NA12878.bwa.log` and `NA12878.sort.log`. There was no BAM at all. The job
-died inside `bwa mem | samtools sort` before sort wrote anything. `--time` is
-enforced on Explorer (`--mem` is not), so it is the limit that actually kills a job.
-A stage that is killed like this leaves a directory that looks as if it started.
-A pipeline that trusted "the folder exists" would be wrong.
-
-## 2. A task that exits 1, with the cohort job on afterok → cohort CANCELLED
-
-**Broke it.** A two-task array in which task 2 runs `exit 1`, plus a dependent
-job submitted exactly as `submit.sh` submits the cohort:
-`--dependency=afterok:<array id> --kill-on-invalid-dep=yes`. I used a stand-in
-dependent job (`--wrap`) rather than the real `02_cohort.sbatch` so that the
-failure could not overwrite my real cohort outputs. The dependency mechanism is
-identical.
+**What happened.**
 
 ```
-JobID             State ExitCode
-10672638_1    COMPLETED      0:0
-10672638_2       FAILED      1:0
-10672639      CANCELLED            Reason=Dependency
+10711368_1   vc-persample   TIMEOUT   00:02:03   0:0   8
+
+===== stage 3 : align =====
+slurmstepd: error: *** JOB 10711368 ON c0617 CANCELLED AT 2026-09-30T16:00:24 DUE TO TIME LIMIT ***
 ```
 
-**What happened.** Task 2 failed, so `afterok` could never be satisfied, and the
-dependent job was CANCELLED with Reason=Dependency within seconds. It never
-started. That is the scheduler refusing to build a wrong answer. Under `afterany`
-the cohort job would have joint-genotyped the samples that did finish. The result
-would be a VCF of the right shape, one sample short, and nothing would say so.
+It stopped inside stage 3. Left on disk: the FastQC reports, both trimmed FASTQs, and in `align/` only `NA12878.bwa.log` and `NA12878.sort.log`. There was no BAM: `samtools sort` writes its output only after it has read all its input, and the job was killed first. `--time` is the limit Explorer enforces, and a folder with logs in it is not a finished stage.
 
-## 3. An array wider than the samplesheet → the out-of-range task refuses
+## 2. One task exits 1, with the cohort job on `afterok` → cohort CANCELLED
 
-**Broke it.** Submitted the real `01_persample.sbatch` with `--array=9` against the
-eight-row `samplesheet.cluster.csv`. I ran index 9 on its own rather than
-`--array=1-9`, to avoid rerunning the eight real samples. Index 9 is the task
-that `--array=1-9` would have added, and it sees exactly the same thing.
+**Command.** A copy of the per-sample script with `exit 1` right after it reads `conf/slurm.env`, and the real cohort script, submitted the way `submit.sh` submits it:
 
 ```
-JobID             State    Elapsed ExitCode
-10672081_9       FAILED   00:00:10     65:0
+F=$(sbatch --parsable -p courses -A binf6610.202710 --array=2 ~/w2ts/break2-fail.sbatch)
+sbatch -p courses -A binf6610.202710 --dependency=afterok:$F --kill-on-invalid-dep=yes ~/w2ts/break2-cohort.sbatch
 ```
 
-**What task 9 did.** It found no row 10 in the sheet and exited 65 in 10 seconds,
-with `task 9: no row 10 in samplesheet.cluster.csv (out-of-range array index), refusing.`
-That is the `[[ -z "${SAMPLE}" ]]` guard in `01_persample.sbatch`.
-
-**What it would have done without the guard.** `SAMPLE` would be empty and
-`run_sample.sh` would have been called with no sample. Every stage would loop over
-nothing, succeed at each, and exit 0. The result: nine COMPLETED tasks and eight
-results, and nothing in `squeue` or `sacct` says which one is fake. This is the only
-one of the four failures that can succeed while being wrong. The other three announce
-themselves.
-
-## 4. scancel mid-write, then resubmit → did the rerun trust the leftovers?
-
-**Broke it.** Submitted a per-sample job (NA12878), let it get past alignment, and
-ran `scancel` during stage 4 (postprocess). Then I resubmitted the identical job.
+**What happened.**
 
 ```
-JobID             State    Elapsed ExitCode
-10672650     CANCELLED+   00:03:32      0:0     (cancelled during postprocess)
-10672678     CANCELLED+   00:04:14      0:0     (the rerun; I cancelled it once it had answered the question)
+10711369_2   vc-persample   FAILED      00:00:01   1:0
+task 2: failing on purpose
+
+10711370     vc-cohort      CANCELLED   Reason=Dependency
 ```
 
-**What was left behind.** `align/NA12878.sorted.bam` (105,849,847 bytes) and
-`postprocess/NA12878.markdup.bam` (132,412,347 bytes) with its `.bai` and
-metrics file.
+The task failed, `afterok` could no longer be met, and the cohort job was cancelled with Reason `Dependency` without ever starting. Under `afterany` it would have started and joint-genotyped whatever samples had finished: a cohort VCF of the right shape, a sample short, and nothing saying so.
 
-**I aimed at X and got Y.** I meant to cancel while MarkDuplicates was still
-writing and to leave a truncated, partial BAM. The `.bai` and metrics file were
-already there, so MarkDuplicates had most likely finished before the cancel landed.
-I cannot claim the leftover BAM was truncated. I did not run `samtools quickcheck`
-on it before the rerun overwrote it.
+## 3. `--array=1-9` against the eight-row samplesheet
 
-**What the rerun did.** It did not trust or even look at the leftovers. It
-restarted at stage 0 and redid validate, qc_raw, trim, align (2,447,146 mapped again)
-and postprocess, overwriting every file. It had reached stage 5 when I cancelled it.
-My pipeline has no resume logic, so a rerun is always safe. It can never build on a
-half-written file, but it also re-spends the full ~8 minutes. The better fix is to
-write each output under a temporary name and rename it only once it is complete.
-Then a rerun can skip finished stages and still never trust a partial one.
+**Command.**
 
----
+```
+sbatch -p courses -A binf6610.202710 --array=1-9 ~/w2ts/break3-range.sbatch
+```
 
-## Problems I did not cause on purpose (found while running the cohort)
+**What happened.**
 
-**The cohort job re-aligned every sample.** Symptom: 12 minutes into the first
-cohort job, `merge/` was empty. `logs/cohort_10671975.err` showed
-`===== stage 3 : align =====` for NA12873. Cause: `02_cohort.sbatch` called
-`run_pipeline.sh` with no stage bounds, so it ran all ten stages and redid, one sample
-at a time, the work the array had just finished. Fix: I added a FIRST-stage argument to
-`run_pipeline.sh` and made the cohort job run `publish merge` (stages 6–9 only). I
-tested it on the smoke data before resubmitting.
+```
+10711371_1 ... 10711371_8   vc-persample   COMPLETED   (05:07 to 11:23)
+10711371_9                  vc-persample   FAILED      00:00:07   65:0
 
-**GenomicsDBImport crawled on shared storage.** Symptom: the second cohort job
-sat on `Importing batch 1 with 8 samples` for 33 minutes. `du` on the workspace
-showed it growing only about 3 MB a minute, so it was working, not hung. The inputs
-were correctly region-limited (18–25 MB GVCFs, `Processing 10000000 bp`), so the
-cause was not the region. Cause: the GenomicsDB workspace was written under the
-run directory in `/home`, which is shared storage, and GenomicsDBImport makes many
-small writes. Fix: I build the workspace in `$TMPDIR` (node-local `/tmp/$SLURM_JOB_ID`,
-cleaned by the trap). GenotypeGVCFs reads it in the same job, so it never needs to
-persist. The next cohort job finished in 8:09. (Adding `--batch-size` and
-`--reader-threads` first made the preload instant but did not fix the import; the
-storage location was the real cause.)
+task 9: no row 10 in /courses/BINF6610.202710/data/samplesheet-variant8.csv (out-of-range array index), refusing.
+```
 
-**REF would have silently fallen back to the smoke reference.** Found before any
-job ran. `run_pipeline.sh` reads `REF="${REF:-smoke/smoke.fa}"`, and the first
-`slurm.env` did not set REF at all. So on Explorer the pipeline would have used a
-relative smoke path that does not exist there. I checked by sourcing `slurm.env`
-and echoing `$REF` from a child shell, which printed an empty value. Fix: `slurm.env`
-now `export`s absolute REF and REGION. The same child-shell check then printed the
-Explorer paths. The single-sample `srun` test confirmed the real reference loaded
-before I submitted the array.
+Tasks 1 to 8 ran the eight samples and wrote eight GVCFs. Task 9 found no row 10 in the samplesheet and refused in 7 seconds, with exit 65: that is the `[[ -z "${SAMPLE}" ]]` guard in `slurm/01_persample.sbatch`.
+
+**Without the guard,** task 9 would have called `run_sample.sh` with an empty sample name. That is the one failure of the four that can succeed while being wrong: nine COMPLETED tasks and eight results, with nothing in `squeue` or `sacct` saying which task did nothing.
+
+## 4. `scancel` mid-write, then resubmit
+
+**Command.** A copy of the per-sample script, one sample (NA12878), cancelled 45 seconds into stage 3, while `bwa mem` was piping into `samtools sort`, then the same script submitted again:
+
+```
+J=$(sbatch --parsable -p courses -A binf6610.202710 --array=1 ~/w2ts/break4-scancel.sbatch)
+scancel $J
+sbatch -p courses -A binf6610.202710 --array=1 ~/w2ts/break4-scancel.sbatch
+```
+
+**What happened.**
+
+```
+10711384_1   vc-persample   CANCELLED by user   00:01:58
+===== stage 3 : align =====
+slurmstepd: error: *** JOB 10711384 ON c0648 CANCELLED AT 2026-09-30T16:00:23 ***
+
+10711401_1   vc-persample   COMPLETED   00:08:13
+align: NA12878 OK (2447146 mapped)
+postprocess: NA12878 OK
+quantify: NA12878 OK
+```
+
+**Did the rerun trust what was left behind? No.** It ran every stage again, trimming and aligning from the start (2,447,146 reads mapped, the same as the submitted run), and overwrote each output. My stages have no resume logic: none of them checks whether its output already exists, so a rerun can never build on a half-written file. The cost is that it also redoes work that had finished; skipping finished stages safely would need each output written under a temporary name and renamed only when complete.
