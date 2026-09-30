@@ -5,7 +5,6 @@
 # runs if all samples finished. Contains NO bioinformatics tool calls.
 #=============================================================================
 #SBATCH --job-name=vc-cohort
-#SBATCH --partition=short
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=4G
 #SBATCH --time=00:30:00
@@ -15,9 +14,7 @@
 
 set -euo pipefail
 
-REPO="${SLURM_SUBMIT_DIR}"
-cd "${REPO}"
-source "${REPO}/slurm/conf/slurm.env"
+source "${SLURM_SUBMIT_DIR}/conf/slurm.env"
 
 mkdir -p logs
 
@@ -29,7 +26,7 @@ mkdir -p "${TMPDIR}"
 trap 'rm -rf "${TMPDIR}"' EXIT
 
 # Run the full pipeline: stages 0-5 are already done and their outputs exist in
-# OUTDIR, so the cohort stages 6-9 (merge, analyze, qc_report, publish) run over
+# RUN_ROOT, so the cohort stages 6-9 (merge, analyze, qc_report, publish) run over
 # all samples. Passing "publish merge" runs stages 6-9 only (FIRST=merge,
 # LAST=publish), reusing the per-sample GVCFs the array already produced.
 printf 'cohort: joint-genotyping and publishing across all samples\n' >&2
@@ -38,8 +35,6 @@ apptainer exec --cleanenv \
     --env TMPDIR="${TMPDIR}" \
     --env SLURM_JOB_ID="${SLURM_JOB_ID}" \
     --env SLURM_CPUS_PER_TASK="${SLURM_CPUS_PER_TASK}" \
-    --env REF="${REF}" \
-    --env REGION="${REGION}" \
-    --bind "/courses/BINF6610.202710,${SCRATCH_DIR}" \
+    --bind /courses/BINF6610.202710,/scratch/${USER} \
     "${SIF}" \
-    bash "${REPO}/run_pipeline.sh" "${SAMPLESHEET}" "${OUTDIR}" publish merge
+    bash "${PIPELINE_DIR}/run_pipeline.sh" "${SAMPLESHEET}" "${RUN_ROOT}" publish merge
