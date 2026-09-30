@@ -336,7 +336,7 @@ if want "cluster"; then
             sha=$(grep -oE '"git_(sha|commit)"[[:space:]]*:[[:space:]]*"[0-9a-f]{7,40}' "${CMAN}" \
                   | grep -oE '[0-9a-f]{7,40}$' | head -1)
             if [[ -z "${sha}" ]]; then
-                problems+=( "the manifest records no git commit (run after your first commit)" )
+                problems+=( "the manifest records no git commit (run after your first commit, from your clone)" )
             elif ! git -C "${REPO}" cat-file -e "${sha}^{commit}" 2>/dev/null; then
                 problems+=( "the manifest's commit ${sha} is not in this repository's history" )
             fi

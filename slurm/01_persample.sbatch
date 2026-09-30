@@ -3,10 +3,9 @@
 # 01_persample.sbatch: stages 0-5 for ONE sample, as one task of an array.
 # Submitted with --array=1-N; task K processes row K of the samplesheet.
 # Contains NO bioinformatics tool calls: it decides WHICH sample runs and with
-# what resources; run_sample.sh -> run_pipeline.sh does the analysis.
+# what resources; run_sample.sh and the stages do the analysis.
 #=============================================================================
 #SBATCH --job-name=vc-persample
-#SBATCH --partition=short
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=24G
 #SBATCH --time=00:30:00
@@ -18,10 +17,8 @@ set -euo pipefail
 
 # The job must bring its own environment and find its own files, not rely on
 # the shell or directory you happened to submit from. sbatch runs a COPY of this
-# script from /var/spool/slurmd, so use $SLURM_SUBMIT_DIR to find the repo.
-REPO="${SLURM_SUBMIT_DIR}"
-cd "${REPO}"
-source "${REPO}/slurm/conf/slurm.env"
+# script from /var/spool/slurmd, so use $SLURM_SUBMIT_DIR to find slurm/conf.
+source "${SLURM_SUBMIT_DIR}/conf/slurm.env"
 
 # Slurm will not create the log directory; a job that cannot open its log dies
 # with nowhere to say why.
@@ -54,4 +51,4 @@ fi
 printf 'task %s -> sample %s\n' "${SLURM_ARRAY_TASK_ID}" "${SAMPLE}" >&2
 
 # Run stages 0-5 for this one sample. run_sample.sh declines the cohort stages.
-bash "${REPO}/run_sample.sh" "${SAMPLESHEET}" "${SAMPLE}" "${OUTDIR}"
+bash "${PIPELINE_DIR}/run_sample.sh" "${SAMPLESHEET}" "${RUN_ROOT}" "${SAMPLE}"
