@@ -18,3 +18,8 @@ tests_w1_backup/
 # the one run output we DO commit (assignment 2)
 !cluster-run/cohort.filtered.vcf.gz
 logs/
+
+work/
+.nextflow/
+.nextflow.log*
+nf-head-*.out
