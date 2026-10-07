@@ -1,129 +1,151 @@
-# TROUBLESHOOTING.md: Assignment 3 (the pipeline in an image)
+# TROUBLESHOOTING.md: Assignment 4 (the pipeline in Nextflow)
 
-**Use of AI assistance.** I used an AI assistant (Claude) to help understand the image creation and the job-script changes and to reason about the failures below. I ran every command myself, on my laptop or on Explorer, and every output is pasted from my terminal. The Assignment 2 log is on the `week2` branch.
+**Use of AI assistance.** I used an AI assistant (Claude) to help write the Nextflow processes and to reason about the failures below. I ran every command myself, on my laptop or on Explorer, and every output is pasted from my terminal. The failures of weeks 1 to 3 are on the `master`, `week2` and `week3` branches.
 
-The four failures were caused on purpose. The throwaway files lived in `~/w3-break1/` on my laptop and `~/w3ts/` on Explorer, outside the repository, and are not committed. Breakages 2 and 3 used copies of `slurm/01_persample.sbatch`, each writing to its own folder under `/scratch`, and were submitted from `slurm/` with `-p courses -A binf6610.202710`.
+## 1. A smoke run stopped halfway, then `-resume`
 
-## 1. An unpinned recipe, rebuilt a day later
-
-**Command.** In `~/w3-break1/`, outside the repository (an unpinned `FROM` inside it would fail the pinning test), a two-line Dockerfile:
+**Command.** A fresh laptop run, stopped 80 seconds in, then the same command with `-resume`:
 
 ```
-FROM ubuntu
-RUN apt-get update && apt-get install -y curl
+timeout -s INT 80 nextflow run main.nf -profile docker -ansi-log false \
+    --samplesheet smoke/samplesheet.csv --ref smoke/smoke.fa --region smoke_1mb
+nextflow run main.nf -profile docker -resume -ansi-log false \
+    --samplesheet smoke/samplesheet.csv --ref smoke/smoke.fa --region smoke_1mb
 ```
 
-```
-docker build -t break1:day1 .                         # Tue Sep 29 22:35:59 EDT 2026
-docker run --rm break1:day1 dpkg -l > day1-dpkg.txt
+`timeout -s INT` sends SIGINT, the signal Ctrl-C sends. Pressing Ctrl-C by hand twice came too late: both runs finished first, the whole pipeline takes 3 minutes.
 
-docker build --pull --no-cache -t break1:day2 .       # Wed Sep 30 21:53:37 EDT 2026
-docker run --rm break1:day2 dpkg -l > day2-dpkg.txt
-diff day1-dpkg.txt day2-dpkg.txt
+**Output.** The interrupted run, `grave_boltzmann`:
+
+```
+[e2/b59c2f] Submitted process > HAPLOTYPECALLER (smoke_03)
+WARN: Killing running tasks (1)
+exit: 124
+grave_boltzmann   1m 24s   ERR
 ```
 
-The two builds were 23 hours 18 minutes apart.
+The `-resume` run, `peaceful_celsius`:
+
+```
+[47/131c7a] Cached process > VALIDATE
+[5f/856d53] Cached process > FASTQC (smoke_01)        ... and the other two FASTQC
+[c9/a35701] Cached process > FASTP (smoke_01)         ... and the other two FASTP
+[8a/12967c] Cached process > BWA_MEM (smoke_01)       ... and the other two BWA_MEM
+[19/55b269] Cached process > MARKDUPLICATES (smoke_01) ... and the other two MARKDUPLICATES
+[e3/fb113b] Submitted process > HAPLOTYPECALLER (smoke_01)
+[92/ac1c4b] Submitted process > HAPLOTYPECALLER (smoke_03)
+[57/2f8e7e] Submitted process > HAPLOTYPECALLER (smoke_02)
+[cd/440b09] Submitted process > MULTIQC
+[3b/e45a0f] Submitted process > JOINT_GENOTYPE
+[c1/cb5f3a] Submitted process > FILTER
+[c5/c00394] Submitted process > PUBLISH
+cached: 13   ran again: 7
+```
+
+**Cached:** the 13 tasks that had finished before the stop: VALIDATE and all three samples' FASTQC, FASTP, BWA_MEM and MARKDUPLICATES. **Ran again:** HaplotypeCaller for smoke_03, which was killed while running, the two HaplotypeCaller tasks that had not started, and the four steps after them. The half-finished HaplotypeCaller task was not trusted: a task is reused only when it finished. PUBLISH runs on every run in any case, because `publish.nf` sets `cache false`. Before this, a `-resume` of a run that had finished cached 19 of the 20 tasks and took 11 seconds instead of 3 minutes 28 seconds.
+
+**Fix.** Nothing to fix: `-resume` on the same command carried on from where the run stopped.
+
+## 2. The reference as a queue channel
+
+**Command.** In `main.nf`, the stage-3 call only:
+
+```
+BWA_MEM(FASTP.out.reads, channel.fromPath(params.ref), ref_index)
+```
+
+then the smoke run with `-resume`, its results in a folder of their own (`--outdir /tmp/w4-break2`).
 
 **Output.**
 
 ```
-ubuntu   latest   sha256:da6fc2be547864451aa253836dd926da33623312df4a9a243e35dc877c378a78   (day 1)
-ubuntu   latest   sha256:da6fc2be547864451aa253836dd926da33623312df4a9a243e35dc877c378a78   (day 2)
-
-image ID, day 1: sha256:ae4daa553a9dbb31c587c9bdb3d424529159663a638fa30413ac81978ab1f472
-image ID, day 2: sha256:faa8b8071bee610296cbbbc637ca00e1c5a7a9166e5ebc106abfc9919e7e6b5b
-
-  122 day1-dpkg.txt
-  122 day2-dpkg.txt
-
-109c109
-< ii  openssl   3.5.5-1ubuntu3.5   amd64   Secure Sockets Layer toolkit - cryptographic utility
----
-> ii  openssl   3.5.5-1ubuntu3.6   amd64   Secure Sockets Layer toolkit - cryptographic utility
+[e2/6434c3] Cached process > BWA_MEM (smoke_03)
+[39/0e97de] Cached process > MARKDUPLICATES (smoke_03)
+[92/ac1c4b] Cached process > HAPLOTYPECALLER (smoke_03)
+[5c/b9a812] Submitted process > JOINT_GENOTYPE
+[f2/1cdb2f] Submitted process > FILTER
+[37/a9b6d5] Submitted process > PUBLISH
+exit: 0
+samples in the VCF: smoke_03
 ```
 
-The base image did not move: `ubuntu:latest` had the same digest on both days. What moved was the package archive. `apt-get update` on day 2 found a newer `openssl` (`3.5.5-1ubuntu3.6` instead of `3.5.5-1ubuntu3.5`), so the same unchanged recipe produced a different image with different software inside, and nothing in the recipe says so. The two images have different IDs and the same number of packages, so only the package list shows the change. It took one day for one package; the longer the gap, the more lines a diff like this gets.
+**BWA_MEM ran for one sample of three, and nothing stopped the run.** `channel.fromPath` makes a queue channel holding one item, the reference. BWA_MEM paired it with the first sample to arrive, smoke_03, and no reference was left for smoke_01 and smoke_02, so they were never aligned. Everything after it ran on that one sample: the run exited 0, and the cohort VCF has a single sample column. Its BWA_MEM task was even cached, because its inputs were the same files as in the earlier run.
 
-**Fix.** Pin everything the recipe installs. My `containers/Dockerfile` starts from a tagged base (`mambaorg/micromamba:2.0.5-ubuntu24.04`), installs nothing from the OS package manager, and gives every tool an `=version`. Anything still left to build day is recorded by the pushed image's digest in `IMAGE.md`, which returns the exact image whatever the archives have done since.
+**Fix.** The reference as a value channel, `ref = file(params.ref)`, which every sample reads.
 
-## 2. `--bind` removed from one job script
+## 3. The backslash taken off `\$(…)`
 
-**Command.** A copy of `slurm/01_persample.sbatch` with the `--bind /courses/BINF6610.202710,/scratch/${USER}` line deleted, one sample:
-
-```
-sbatch -p courses -A binf6610.202710 --array=1 ~/w3ts/break2-nobind.sbatch
-```
-
-**Output.**
+**Command.** In `modules/markduplicates.nf`,
 
 ```
-10712934_1   FAILED   00:01:30   65:0   8
-
-task 1 -> sample NA12878
-awk: cannot open "/courses/BINF6610.202710/data/samplesheet-variant8.csv" (No such file or directory)
-ERROR: run_sample.sh: no sample named 'NA12878' in /courses/BINF6610.202710/data/samplesheet-variant8.csv
+reads=\$(samtools view -c ${meta.id}.markdup.bam)
 ```
 
-It stopped before stage 0, in `run_sample.sh`'s check that the sample is in the samplesheet, with exit code 65. **The path the container could not see was `/courses/BINF6610.202710`**, which holds the samplesheet, the FASTQs and the reference. Without `--bind`, Apptainer shows the container only my home directory, `/tmp` and the directory the job ran from.
+became `reads=$(samtools view -c ${meta.id}.markdup.bam)`, then the smoke run with `-resume`.
 
-The last line of that log is misleading: NA12878 is in the samplesheet. The job script read its name from that same file, outside the container, a line earlier. To be sure, I ran the same lookup in the image with and without the bind:
-
-```
-outside the container, first sample in the sheet: NA12878
---- inside the image, with --bind ---
-/courses/BINF6610.202710
-NA12878,affected,1,paired,/courses/BINF6610.202710/data/fastq-variant/NA12878_R1.fastq.gz,/courses/BINF6610.202710/data/fastq-variant/NA12878_R2.fastq.gz
-rows exit: 0
---- inside the image, without --bind ---
-ls: cannot access '/courses/BINF6610.202710': No such file or directory
-awk: cannot open "/courses/BINF6610.202710/data/samplesheet-variant8.csv" (No such file or directory)
-```
-
-So the sample was never missing. The samplesheet could not be opened at all, the lookup returned nothing, and the check reported that as a missing sample. The error you read first is a consequence; the cause is the line above it.
-
-**Fix.** `--bind /courses/BINF6610.202710,/scratch/${USER}` on the `apptainer exec` line, as in both committed job scripts.
-
-## 3. `--env THREADS` removed from one job script
-
-**Command.** A copy of `slurm/01_persample.sbatch` with the `--env THREADS="${THREADS}"` line deleted, one sample, on a job holding 8 cores:
+**Output.** Nextflow started, MarkDuplicates ran, and the task failed afterwards:
 
 ```
-sbatch -p courses -A binf6610.202710 --array=1 ~/w3ts/break3-nothreads.sbatch
+Tool returned:
+0
+.command.sh: line 7: syntax error near unexpected token `)'
+Work dir:
+  /home/aaroubu/binf6610/assignment1/work/7e/69f50e24dc9a4d7b2e73fc7c363845
 ```
 
-**Output.**
+In that work folder, `.command.sh`:
 
 ```
-10712947_1   COMPLETED   00:10:44   0:0   8
-
-[main] CMD: bwa mem -t 4 -R @RG\tID:NA12878 ...
-
-IntelPairHmm - Available threads: 8
-IntelPairHmm - Requested threads: 4
+samtools index smoke_01.markdup.bam
+reads=smoke_01samtools view -c smoke_01.markdup.bam)
+(( reads > 0 )) || { echo "markduplicates:  has no reads" >&2; exit 1; }
 ```
 
-Nothing failed. The job completed with exit 0 while holding 8 cores, and `bwa mem` ran with `-t 4`. Under `--cleanenv` the job's `THREADS=8` never reached the container, so the pipeline used the default in `lib/common.sh`, `THREADS=${THREADS:-4}`, and half the cores sat idle. Only the log shows it. In the committed run, with the `--env` line, every sample's log reads `bwa mem -t 8`. GATK's `Requested threads: 4` is the same in both runs, because my pipeline never passes a thread count to HaplotypeCaller and GATK uses its own default of 4; `bwa`'s `-t` is where the missing variable shows.
+`.command.err` ends with the same `syntax error near unexpected token ')'`, and `.exitcode` is `2`. `bash .command.run` in that folder ran the task again in its container: MarkDuplicates finished, then the same syntax error, exit 2.
 
-**Fix.** `--env THREADS="${THREADS}"` on the `apptainer exec` line, as in both committed job scripts.
+Without the backslash, Nextflow read the `$(` itself instead of passing it to bash. The `$(` disappeared, the sample name landed in front of `samtools`, a lone `)` was left behind, and the sample name in the next line came out empty. Bash stopped on that line. This is unlike the brief's `\$n` example, which stops Nextflow before any task runs: here the run started, and the tool ran, before the script failed.
 
-## 4. An arm64 image on Explorer
+**Fix.** Put the backslash back. Commands with many `$` signs are in scripts in `bin/` (`align.sh`, `joint_genotype.sh`, `variants_table.sh`, `validate_samplesheet.sh`), where bash reads them as written.
 
-**Command.** On a compute node:
+## 4. `time = '2m'` for HAPLOTYPECALLER on the first Explorer run
 
-```
-apptainer pull --arch arm64 arm.sif docker://ubuntu:24.04
-apptainer exec arm.sif uname -m
-```
+**Command.** In the `explorer` profile, HAPLOTYPECALLER given a block of its own with `time = '2m'` (BWA_MEM kept `1h`), then `sbatch slurm/nextflow.sbatch`: head job 10853480.
 
-**Output.**
+**Output.** From the head job's log:
 
 ```
-INFO:    Creating SIF file...
-pull exit: 0
-FATAL:   While checking container encryption: could not open image /scratch/deshpande.aaro/arm.sif: the image's architecture (arm64) could not run on the host's (amd64)
-run exit: 255
+ERROR ~ Error executing process > 'HAPLOTYPECALLER (NA12878)'
+Caused by:
+  Process `HAPLOTYPECALLER (NA12878)` terminated with an error exit status (140)
 ```
 
-The pull succeeded: Apptainer downloads and converts an image for whatever architecture it is asked for. The failure appears only when something runs, and the message names both architectures. An arm64 image built on an Apple laptop without `--platform` would pass every step on the laptop, push, and pull, and fail only here.
+GATK's progress for NA12878 had reached `chr20:2386358` when it stopped. From `sacct`:
 
-**Fix.** Build with `docker build --platform linux/amd64`, and check with `docker image inspect --format '{{.Architecture}}'` before pushing. My image reports `amd64`.
+```
+             JobID                          JobName            State    Elapsed  Timelimit ExitCode
+          10853553     nf-HAPLOTYPECALLER_(NA12878)           FAILED   00:01:54   00:02:00     12:0
+          10853565     nf-HAPLOTYPECALLER_(NA12892) CANCELLED by 10+   00:01:39   00:02:00      0:0
+          10853566     nf-HAPLOTYPECALLER_(NA10851)           FAILED   00:01:35   00:02:00     12:0
+          10853568     nf-HAPLOTYPECALLER_(NA07357)           FAILED   00:01:15   00:02:00     12:0
+          10853570     nf-HAPLOTYPECALLER_(NA12891) CANCELLED by 10+   00:01:07   00:02:00      0:0
+          10853583     nf-HAPLOTYPECALLER_(NA12003) CANCELLED by 10+   00:00:02   00:02:00      0:0
+10853480        nf-head     FAILED   00:07:13   04:00:00      1:0
+```
+
+**No job shows TIMEOUT.** Every task's job is submitted with `#SBATCH --signal B:USR2@30`, so Slurm sends SIGUSR2 shortly before the two-minute limit and Nextflow stops the task itself. Exit status 140 is 128 + 12, and 12 is SIGUSR2; `sacct` records exit code 12 for the tasks stopped that way, every one of them with an Elapsed under its Timelimit. The jobs marked `CANCELLED by` were cancelled by Nextflow when it ended the run after the first failure.
+
+**Fix.** `time = '1h'` back, as in the committed `nextflow.config`, and the same `sbatch` again: head job 10878890, COMPLETED in 22 minutes 13 seconds. `-resume` reused the 30 tasks that had finished and ran 15, among them all eight HaplotypeCaller tasks.
+
+## A problem I did not cause: two images converted at once
+
+My first Explorer submission, head job 10852256, failed after 5 minutes 17 seconds, before any analysis task, at `FASTQC (1)`:
+
+```
+Failed to pull singularity image
+  command: apptainer pull --name quay.io-biocontainers-fastqc-0.12.1--hdfd78af_0.img.pulling... docker://quay.io/biocontainers/fastqc:0.12.1--hdfd78af_0
+  status : 255
+  FATAL: While making image from oci registry: error fetching image to cache: while building SIF from layers:
+         conveyor failed to get: while getting config: no descriptor found for reference "73c60af0c4748c756d33d4e3b6852f775c0d65abbab26571a51d636a17c73761"
+```
+
+Nextflow had started converting the fastp and the fastqc images in the same second, and both conversions use one Apptainer cache. The download had finished; the conversion that assembles the image failed. **Fix.** I converted the six images one at a time in a job of their own, into `/scratch/<user>/nxf-apptainer/` under the file names Nextflow looks for, and the next run used them without converting anything.
