@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SHEET=${1:?usage: validate_samplesheet.sh <samplesheet.csv> <reference.fa>}
-REF=$(basename "${2:?usage: validate_samplesheet.sh <samplesheet.csv> <reference.fa>}")
+REF=${2:?usage: validate_samplesheet.sh <samplesheet.csv> <reference.fa>}
 
 log() { printf '%s\n' "$*" >&2; }
 
@@ -35,7 +35,7 @@ if (( ${#problems[@]} == 0 )); then
                 problems+=( "${id}: library_type is '${lt}' but a fastq path is empty" )
                 continue
             fi
-            f=$(basename "$f")
+            [[ "$f" == /* ]] || f="$(dirname "$SHEET")/$f"
             if [[ ! -f "$f" ]]; then
                 problems+=( "${id}: file not found: ${f}" )
                 continue
