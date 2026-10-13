@@ -5,10 +5,10 @@
     "implementation": "snakemake",
     "revision": "none",
     "git_sha": "none",
-    "run_id": "snakemake-20261013T010916",
-    "started_at": "2026-10-13T01:09:16.710039-04:00",
+    "run_id": "snakemake-20261013T132203",
+    "started_at": "2026-10-13T13:22:03.016585-04:00",
     "launch_dir": "/home/aaroubu/binf6610/assignment1",
-    "finished_at": "2026-10-13T05:11:18Z",
+    "finished_at": "2026-10-13T17:24:10Z",
     "exit_status": "success"
   },
   "params": {
@@ -31,9 +31,9 @@
     {"sample_id": "smoke_03", "library_type": "single", "condition": "affected"}
   ],
   "outputs": [
-    {"path": "cohort.filtered.vcf.gz", "checksum": "sha256:6b1eab1146b44424554cf4f157f2c89487bb6163c3f46a931ab27c13835b3db8"},
-    {"path": "cohort.filtered.vcf.gz.tbi", "checksum": "sha256:0f2953d4033c8b6561919bac270dc7bba0b7b24adfb0f6376ce3089e4ac7c0ad"},
-    {"path": "multiqc_report.html", "checksum": "sha256:9b6ba6cd69e3c48e60d6a4d7ca809393546235abbb2a57a93b03f11280eb5718"},
+    {"path": "cohort.filtered.vcf.gz", "checksum": "sha256:d4e8f21446af7efc739e13a82bdaf1eb346bff32e19505dd88f35fe02afcbb8c"},
+    {"path": "cohort.filtered.vcf.gz.tbi", "checksum": "sha256:bb70f699161d0a317071dfb2349f32bcc824d42b9e51821b1f97fc2cce1954de"},
+    {"path": "multiqc_report.html", "checksum": "sha256:df25a6078d730629951def6d6cf7e3c4f794bc687b09adbb2361dd06db369ee1"},
     {"path": "samples.tsv", "checksum": "sha256:d534edf8132cce4c541af0eea6cc345b17613e1b4a7a5286742aa8d16395257c"},
     {"path": "variants.tsv", "checksum": "sha256:fa075326455bdce3c7b91e3e377815c7590bcdb501310bab17a47d2f54d492fb"}
   ]
