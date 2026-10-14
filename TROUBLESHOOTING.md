@@ -1,151 +1,120 @@
-# TROUBLESHOOTING.md: Assignment 4 (the pipeline in Nextflow)
+# TROUBLESHOOTING.md: Assignment 5 (the pipeline in Snakemake)
 
-**Use of AI assistance.** I used an AI assistant (Claude) to help write the Nextflow processes and to reason about the failures below. I ran every command myself, on my laptop or on Explorer, and every output is pasted from my terminal. The failures of weeks 1 to 3 are on the `master`, `week2` and `week3` branches.
+**Use of AI assistance.** I used an AI assistant (Claude) to help write the Snakefile and the profiles and to reason about the failures below. I ran every command myself, on my laptop or on Explorer, and every output is pasted from my terminal. The failures of weeks 1 to 4 are on the `master`, `week2`, `week3` and `week4` branches.
 
-## 1. A smoke run stopped halfway, then `-resume`
+## 1. A smoke run stopped halfway, then the same command
 
-**Command.** A fresh laptop run, stopped 80 seconds in, then the same command with `-resume`:
-
-```
-timeout -s INT 80 nextflow run main.nf -profile docker -ansi-log false \
-    --samplesheet smoke/samplesheet.csv --ref smoke/smoke.fa --region smoke_1mb
-nextflow run main.nf -profile docker -resume -ansi-log false \
-    --samplesheet smoke/samplesheet.csv --ref smoke/smoke.fa --region smoke_1mb
-```
-
-`timeout -s INT` sends SIGINT, the signal Ctrl-C sends. Pressing Ctrl-C by hand twice came too late: both runs finished first, the whole pipeline takes 3 minutes.
-
-**Output.** The interrupted run, `grave_boltzmann`:
+**Command.** On the laptop, a smoke run from empty outputs, stopped 25 seconds in with SIGINT, the signal Ctrl-C sends, then the same command again:
 
 ```
-[e2/b59c2f] Submitted process > HAPLOTYPECALLER (smoke_03)
-WARN: Killing running tasks (1)
-exit: 124
-grave_boltzmann   1m 24s   ERR
+timeout -s INT 25 snakemake --profile profiles/laptop --config samplesheet=... ref=... region=smoke_1mb
+snakemake --profile profiles/laptop --config samplesheet=... ref=... region=smoke_1mb
 ```
 
-The `-resume` run, `peaceful_celsius`:
+**What Snakemake said.** The stopped run:
 
 ```
-[47/131c7a] Cached process > VALIDATE
-[5f/856d53] Cached process > FASTQC (smoke_01)        ... and the other two FASTQC
-[c9/a35701] Cached process > FASTP (smoke_01)         ... and the other two FASTP
-[8a/12967c] Cached process > BWA_MEM (smoke_01)       ... and the other two BWA_MEM
-[19/55b269] Cached process > MARKDUPLICATES (smoke_01) ... and the other two MARKDUPLICATES
-[e3/fb113b] Submitted process > HAPLOTYPECALLER (smoke_01)
-[92/ac1c4b] Submitted process > HAPLOTYPECALLER (smoke_03)
-[57/2f8e7e] Submitted process > HAPLOTYPECALLER (smoke_02)
-[cd/440b09] Submitted process > MULTIQC
-[3b/e45a0f] Submitted process > JOINT_GENOTYPE
-[c1/cb5f3a] Submitted process > FILTER
-[c5/c00394] Submitted process > PUBLISH
-cached: 13   ran again: 7
+9 of 21 steps (43%) done
+Terminating processes on user request, this might take some time.
+CalledProcessError in file ".../Snakefile", line 167:
+Error in rule markduplicates:
+    log: logs/markduplicates/smoke_02.log (check log file(s) for error details)
+Error in rule markduplicates:
+    log: logs/markduplicates/smoke_01.log (check log file(s) for error details)
 ```
 
-**Cached:** the 13 tasks that had finished before the stop: VALIDATE and all three samples' FASTQC, FASTP, BWA_MEM and MARKDUPLICATES. **Ran again:** HaplotypeCaller for smoke_03, which was killed while running, the two HaplotypeCaller tasks that had not started, and the four steps after them. The half-finished HaplotypeCaller task was not trusted: a task is reused only when it finished. PUBLISH runs on every run in any case, because `publish.nf` sets `cache false`. Before this, a `-resume` of a run that had finished cached 19 of the 20 tasks and took 11 seconds instead of 3 minutes 28 seconds.
+Nine jobs had finished. The two MarkDuplicates jobs running at that moment were stopped, and Snakemake recorded them as failed.
 
-**Fix.** Nothing to fix: `-resume` on the same command carried on from where the run stopped.
-
-## 2. The reference as a queue channel
-
-**Command.** In `main.nf`, the stage-3 call only:
+**The same command** started without complaint and ran the 12 jobs that had not finished:
 
 ```
-BWA_MEM(FASTP.out.reads, channel.fromPath(params.ref), ref_index)
+bwa_mem                1
+markduplicates         3
+haplotypecaller        3
+multiqc                1
+joint_genotype         1
+filter                 1
+publish                1
+all                    1
+total                 12
+12 of 12 steps (100%) done
 ```
 
-then the smoke run with `-resume`, its results in a folder of their own (`--outdir /tmp/w4-break2`).
+**I aimed at `IncompleteFilesException` and the option `--rerun-incomplete`, and got neither.** Stopped with Ctrl-C, Snakemake terminated its jobs itself and treated them as failed jobs, whose outputs it does not keep, so nothing was left marked incomplete and no option was needed: the next run made those files again. The session's slides say the same: `IncompleteFilesException`, with its advice to add `--rerun-incomplete`, comes when Snakemake is killed outright and cannot clean up, as when the terminal is closed. Run afterwards with `--rerun-incomplete`, Snakemake found only `publish` and `all` to run, the two rules that run every time.
+
+**Fix.** Nothing to fix: the same command carried on from the nine finished jobs.
+
+## 2. The stage-3 log without `{sample}`
+
+**Command.** In the Snakefile, the `log:` of `bwa_mem` changed from `"logs/bwa_mem/{sample}.log"` to `"logs/bwa_mem.log"`, then:
+
+```
+snakemake --profile profiles/laptop -n --config samplesheet=... ref=... region=smoke_1mb
+```
 
 **Output.**
 
 ```
-[e2/6434c3] Cached process > BWA_MEM (smoke_03)
-[39/0e97de] Cached process > MARKDUPLICATES (smoke_03)
-[92/ac1c4b] Cached process > HAPLOTYPECALLER (smoke_03)
-[5c/b9a812] Submitted process > JOINT_GENOTYPE
-[f2/1cdb2f] Submitted process > FILTER
-[37/a9b6d5] Submitted process > PUBLISH
-exit: 0
-samples in the VCF: smoke_03
+RuleException in file "/home/aaroubu/binf6610/assignment1/Snakefile", line 135:
+Not all output, log and benchmark files of rule bwa_mem contain the same wildcards. This is crucial though, in order to avoid that two or more jobs write to the same file.
 ```
 
-**BWA_MEM ran for one sample of three, and nothing stopped the run.** `channel.fromPath` makes a queue channel holding one item, the reference. BWA_MEM paired it with the first sample to arrive, smoke_03, and no reference was left for smoke_01 and smoke_02, so they were never aligned. Everything after it ran on that one sample: the run exited 0, and the cohort VCF has a single sample column. Its BWA_MEM task was even cached, because its inputs were the same files as in the earlier run.
+**Why Snakemake refuses it.** `bwa_mem` runs once per sample, and each job is told its own file names by filling `{sample}` into the output and log patterns. A log without `{sample}` names the same file for every sample, so the three jobs, eight on Explorer, would all write into one log at once. Snakemake checks this when it reads the Snakefile and stops before planning any job.
 
-**Fix.** The reference as a value channel, `ref = file(params.ref)`, which every sample reads.
+**Fix.** `log: "logs/bwa_mem/{sample}.log"`, as in the committed Snakefile.
 
-## 3. The backslash taken off `\$(…)`
+## 3. The two `wildcard_constraints:` removed
 
-**Command.** In `modules/markduplicates.nf`,
+**Command.** Both `wildcard_constraints:` blocks deleted, from `fastp_paired` and from `fastp_single`, then `snakemake -n` as above.
 
-```
-reads=\$(samtools view -c ${meta.id}.markdup.bam)
-```
-
-became `reads=$(samtools view -c ${meta.id}.markdup.bam)`, then the smoke run with `-resume`.
-
-**Output.** Nextflow started, MarkDuplicates ran, and the task failed afterwards:
+**Output.**
 
 ```
-Tool returned:
-0
-.command.sh: line 7: syntax error near unexpected token `)'
-Work dir:
-  /home/aaroubu/binf6610/assignment1/work/7e/69f50e24dc9a4d7b2e73fc7c363845
+AmbiguousRuleException:
+Rules fastp_single and fastp_paired are ambiguous for the file work/trim/smoke_01_R1.trim.fastq.gz.
+Consider starting rule output with a unique prefix, constrain your wildcards, or use the ruleorder directive.
+Wildcards:
+     fastp_single: sample=smoke_01
+     fastp_paired: sample=smoke_01
+Expected input files:
+     fastp_single: .../smoke/smoke_01_R1.fastq.gz work/validate/samplesheet.csv
+     fastp_paired: .../smoke/smoke_01_R1.fastq.gz .../smoke/smoke_01_R2.fastq.gz work/validate/samplesheet.csv
 ```
 
-In that work folder, `.command.sh`:
+**The two rules and the file.** `fastp_paired` and `fastp_single` both name the output `work/trim/{sample}_R1.trim.fastq.gz`, so without constraints either one can make `work/trim/smoke_01_R1.trim.fastq.gz`, and Snakemake will not guess which. It even shows what each would read: the single-end rule one FASTQ, the paired rule two. With the constraints, `sample` may only be a paired sample in one rule and a single-end sample in the other, so each sample has exactly one rule.
+
+**Fix.** Both `wildcard_constraints:` back: `sample=one_of(PAIRED)` and `sample=one_of(SINGLE)`.
+
+## 4. No Apptainer, on the first Explorer run
+
+**Command.** `software-deployment-method: apptainer` deleted from `profiles/explorer/profile.yaml`, then `sbatch slurm/snakemake.sbatch`: head job 11042456.
+
+**Output.** The head job ended `FAILED` after 19 minutes 38 seconds. **`validate` finished**; its log, `logs/validate.log`, says `validate: OK, 8 samples`. **The rules that failed were `fastqc`, `fastp_paired` and `fastp_single`**, for all eight samples. The Slurm log of one of them, `.snakemake/slurm_logs/rule_fastqc/NA12878/11042561.log`:
 
 ```
-samtools index smoke_01.markdup.bam
-reads=smoke_01samtools view -c smoke_01.markdup.bam)
-(( reads > 0 )) || { echo "markduplicates:  has no reads" >&2; exit 1; }
+Command 'set -euo pipefail;  (mkdir -p work/fastqc/NA12878 && fastqc -q -o work/fastqc/NA12878 /courses/.../NA12878_R1.fastq.gz /courses/.../NA12878_R2.fastq.gz) 2> logs/fastqc/NA12878.log' returned non-zero exit status 127.
 ```
 
-`.command.err` ends with the same `syntax error near unexpected token ')'`, and `.exitcode` is `2`. `bash .command.run` in that folder ran the task again in its container: MarkDuplicates finished, then the same syntax error, exit 2.
-
-Without the backslash, Nextflow read the `$(` itself instead of passing it to bash. The `$(` disappeared, the sample name landed in front of `samtools`, a lone `)` was left behind, and the sample name in the next line came out empty. Bash stopped on that line. This is unlike the brief's `\$n` example, which stops Nextflow before any task runs: here the run started, and the tool ran, before the script failed.
-
-**Fix.** Put the backslash back. Commands with many `$` signs are in scripts in `bin/` (`align.sh`, `joint_genotype.sh`, `variants_table.sh`, `validate_samplesheet.sh`), where bash reads them as written.
-
-## 4. `time = '2m'` for HAPLOTYPECALLER on the first Explorer run
-
-**Command.** In the `explorer` profile, HAPLOTYPECALLER given a block of its own with `time = '2m'` (BWA_MEM kept `1h`), then `sbatch slurm/nextflow.sbatch`: head job 10853480.
-
-**Output.** From the head job's log:
+The rules' own logs:
 
 ```
-ERROR ~ Error executing process > 'HAPLOTYPECALLER (NA12878)'
-Caused by:
-  Process `HAPLOTYPECALLER (NA12878)` terminated with an error exit status (140)
+logs/fastqc/NA12878.log:  /usr/bin/bash: line 1: fastqc: command not found
+logs/fastp/NA12878.log:   /usr/bin/bash: line 1: fastp: command not found
 ```
 
-GATK's progress for NA12878 had reached `chr20:2386358` when it stopped. From `sacct`:
+Without the line, Snakemake ignores every rule's `container:` and runs the command on the compute node itself, where `fastqc` and `fastp` are not installed. Exit status 127 is bash's "command not found". `validate` needs only `bash`, `gzip` and `awk`, which every node has, so it was the one rule that passed.
+
+**Fix.** The line put back. Before submitting again, `snakemake -n` planned `validate` again although it had finished:
 
 ```
-             JobID                          JobName            State    Elapsed  Timelimit ExitCode
-          10853553     nf-HAPLOTYPECALLER_(NA12878)           FAILED   00:01:54   00:02:00     12:0
-          10853565     nf-HAPLOTYPECALLER_(NA12892) CANCELLED by 10+   00:01:39   00:02:00      0:0
-          10853566     nf-HAPLOTYPECALLER_(NA10851)           FAILED   00:01:35   00:02:00     12:0
-          10853568     nf-HAPLOTYPECALLER_(NA07357)           FAILED   00:01:15   00:02:00     12:0
-          10853570     nf-HAPLOTYPECALLER_(NA12891) CANCELLED by 10+   00:01:07   00:02:00      0:0
-          10853583     nf-HAPLOTYPECALLER_(NA12003) CANCELLED by 10+   00:00:02   00:02:00      0:0
-10853480        nf-head     FAILED   00:07:13   04:00:00      1:0
+rule validate:
+    reason: Software environment definition has changed since last execution
 ```
 
-**No job shows TIMEOUT.** Every task's job is submitted with `#SBATCH --signal B:USR2@30`, so Slurm sends SIGUSR2 shortly before the two-minute limit and Nextflow stops the task itself. Exit status 140 is 128 + 12, and 12 is SIGUSR2; `sacct` records exit code 12 for the tasks stopped that way, every one of them with an Elapsed under its Timelimit. The jobs marked `CANCELLED by` were cancelled by Nextflow when it ended the run after the first failure.
-
-**Fix.** `time = '1h'` back, as in the committed `nextflow.config`, and the same `sbatch` again: head job 10878890, COMPLETED in 22 minutes 13 seconds. `-resume` reused the 30 tasks that had finished and ran 15, among them all eight HaplotypeCaller tasks.
-
-## A problem I did not cause: two images converted at once
-
-My first Explorer submission, head job 10852256, failed after 5 minutes 17 seconds, before any analysis task, at `FASTQC (1)`:
+Snakemake records how each job's software was provided, and a job made without the image is not the same as one made in it, so it reruns. The next head job, 11046443, stopped at 15 of 46 steps for a reason that was not my pipeline: Slurm refused two submissions,
 
 ```
-Failed to pull singularity image
-  command: apptainer pull --name quay.io-biocontainers-fastqc-0.12.1--hdfd78af_0.img.pulling... docker://quay.io/biocontainers/fastqc:0.12.1--hdfd78af_0
-  status : 255
-  FATAL: While making image from oci registry: error fetching image to cache: while building SIF from layers:
-         conveyor failed to get: while getting config: no descriptor found for reference "73c60af0c4748c756d33d4e3b6852f775c0d65abbab26571a51d636a17c73761"
+sbatch: error: Batch job submission failed: Unexpected message received
 ```
 
-Nextflow had started converting the fastp and the fastqc images in the same second, and both conversions use one Apptainer cache. The download had finished; the conversion that assembles the image failed. **Fix.** I converted the six images one at a time in a job of their own, into `/scratch/<user>/nxf-apptainer/` under the file names Nextflow looks for, and the next run used them without converting anything.
+and the same head job submitted once more, 11051634, ran the 29 steps that were left and ended `COMPLETED` after 25 minutes 31 seconds. The logs of all three head jobs are in `cluster-run-smk/`.
