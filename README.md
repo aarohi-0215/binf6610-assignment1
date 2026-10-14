@@ -15,3 +15,7 @@ Last week the software came from the course conda environment; this week it come
 ## Assignment 4: the pipeline in Nextflow
 
 The same ten stages, written as Nextflow processes: `main.nf` reads the samplesheet and connects them, one process per stage in `modules/`, the scripts they run in `bin/`, and `nextflow.config` with the profiles `docker` and `explorer`. The weeks 1 to 3 pipeline stays beside it. The laptop run on the smoke dataset is in `smoke-run-nf/`; the Explorer run on the eight samples, submitted by `slurm/nextflow.sbatch`, is in `cluster-run-nf/`.
+
+## Assignment 5: the pipeline in Snakemake
+
+The same ten stages, written as Snakemake rules, connected by nothing but file names: `rule all` names the files the run must end with, and Snakemake works backwards from them. The `Snakefile` holds the rules, `config.yaml` the run's values and the image table, and `profiles/laptop` and `profiles/explorer` say how and where a run goes. The weeks 1 to 4 pipelines stay beside it. The laptop run on the smoke dataset is in `smoke-run-smk/`; the Explorer run on the eight samples, submitted by `slurm/snakemake.sbatch`, is in `cluster-run-smk/`.
