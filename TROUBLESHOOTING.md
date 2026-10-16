@@ -1,7 +1,5 @@
 # TROUBLESHOOTING.md: Assignment 5 (the pipeline in Snakemake)
 
-**Use of AI assistance.** I used an AI assistant (Claude) to help write the Snakefile and the profiles and to reason about the failures below. I ran every command myself, on my laptop or on Explorer, and every output is pasted from my terminal. The failures of weeks 1 to 4 are on the `master`, `week2`, `week3` and `week4` branches.
-
 ## 1. A smoke run stopped halfway, then the same command
 
 **Command.** On the laptop, a smoke run from empty outputs, stopped 25 seconds in with SIGINT, the signal Ctrl-C sends, then the same command again:
