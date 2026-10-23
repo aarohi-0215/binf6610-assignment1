@@ -19,3 +19,7 @@ The same ten stages, written as Nextflow processes: `main.nf` reads the samplesh
 ## Assignment 5: the pipeline in Snakemake
 
 The same ten stages, written as Snakemake rules, connected by nothing but file names: `rule all` names the files the run must end with, and Snakemake works backwards from them. The `Snakefile` holds the rules, `config.yaml` the run's values and the image table, and `profiles/laptop` and `profiles/explorer` say how and where a run goes. The weeks 1 to 4 pipelines stay beside it. The laptop run on the smoke dataset is in `smoke-run-smk/`; the Explorer run on the eight samples, submitted by `slurm/snakemake.sbatch`, is in `cluster-run-smk/`.
+
+## Assignment 6: the pipeline on AWS Batch, both ways
+
+The pipeline ran on AWS Batch with Fargate, on the smoke dataset, from an S3 bucket. Part A, the general way: the week-3 image with the AWS CLI, the pipeline and `aws/batch_run.sh` added (`aws/Dockerfile`), pushed to ECR (`IMAGE.md`), ran the whole pipeline as one Batch job; its manifest and VCF are in `aws-run/`. Part B: the week-4 Nextflow pipeline sent each task to Batch as a job of its own through the `awsbatch` profile in `nextflow.config`; its results are in `aws-run-nf/`. Both runs' variant records match the laptop's. `teardown-check.txt` shows that everything made in AWS was deleted afterwards.
