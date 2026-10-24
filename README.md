@@ -4,22 +4,8 @@ A ten-stage bash pipeline that turns raw sequencing reads into a filtered cohort
 
 Run: `./run_pipeline.sh <samplesheet.csv> <outdir> [last-stage]`
 
-## Assignment 2: the same pipeline as a Slurm job array on Explorer
-
-Stages 0–5 run as an eight-task array, one sample per task (`slurm/01_persample.sbatch` → `run_sample.sh`). Stages 6–9 run once, only after every task succeeds (`slurm/02_cohort.sbatch`, gated on `afterok`). Submit from the repo root on Explorer: `bash slurm/submit.sh`. The cluster run's filtered VCF and manifest are in `cluster-run/`; measurements are in `RESOURCES.md`.
-
-## Assignment 3: the pipeline in a container
-
-Last week the software came from the course conda environment; this week it comes from an image built from `containers/Dockerfile`, pinned to the course environment's versions, pushed to Docker Hub and fetched onto Explorer by `slurm/pull.sbatch`. Both job scripts run the pipeline through `apptainer exec --cleanenv --bind`, and the pipeline itself does not change. The run through the image is in `cluster-run-container/`; the base image, the pinned versions and the pushed image's digest are in `IMAGE.md`.
-
-## Assignment 4: the pipeline in Nextflow
-
-The same ten stages, written as Nextflow processes: `main.nf` reads the samplesheet and connects them, one process per stage in `modules/`, the scripts they run in `bin/`, and `nextflow.config` with the profiles `docker` and `explorer`. The weeks 1 to 3 pipeline stays beside it. The laptop run on the smoke dataset is in `smoke-run-nf/`; the Explorer run on the eight samples, submitted by `slurm/nextflow.sbatch`, is in `cluster-run-nf/`.
-
-## Assignment 5: the pipeline in Snakemake
-
-The same ten stages, written as Snakemake rules, connected by nothing but file names: `rule all` names the files the run must end with, and Snakemake works backwards from them. The `Snakefile` holds the rules, `config.yaml` the run's values and the image table, and `profiles/laptop` and `profiles/explorer` say how and where a run goes. The weeks 1 to 4 pipelines stay beside it. The laptop run on the smoke dataset is in `smoke-run-smk/`; the Explorer run on the eight samples, submitted by `slurm/snakemake.sbatch`, is in `cluster-run-smk/`.
+This branch is Assignment 6. Each earlier assignment is on its own branch: `master` (Assignment 1), `week2` (Slurm), `week3` (containers), `week4` (Nextflow) and `week5` (Snakemake).
 
 ## Assignment 6: the pipeline on AWS Batch, both ways
 
-The pipeline ran on AWS Batch with Fargate, on the smoke dataset, from an S3 bucket. Part A, the general way: the week-3 image with the AWS CLI, the pipeline and `aws/batch_run.sh` added (`aws/Dockerfile`), pushed to ECR (`IMAGE.md`), ran the whole pipeline as one Batch job; its manifest and VCF are in `aws-run/`. Part B: the week-4 Nextflow pipeline sent each task to Batch as a job of its own through the `awsbatch` profile in `nextflow.config`; its results are in `aws-run-nf/`. Both runs' variant records match the laptop's. `teardown-check.txt` shows that everything made in AWS was deleted afterwards.
+The pipeline ran on AWS Batch with Fargate, on the smoke dataset, from an S3 bucket. Part A, the general way: the week-3 image with the AWS CLI, the pipeline and `aws/batch_run.sh` added (`aws/Dockerfile`), pushed to ECR (`IMAGE.md`), ran the whole pipeline (`run_pipeline.sh`, `lib/`, `stages/`) as one Batch job; its manifest and VCF are in `aws-run/`. Part B: the week-4 Nextflow pipeline (`main.nf`, `modules/`, `bin/`) sent each task to Batch as a job of its own through the `awsbatch` profile in `nextflow.config`; its results are in `aws-run-nf/`. Both runs' variant records match the laptop's run in `smoke-run/`. `teardown-check.txt` shows that everything made in AWS was deleted afterwards.
