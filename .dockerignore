@@ -16,3 +16,7 @@ tests_w1_backup
 rnaseq-week1
 *.zip
 nf-head-*.out
+tests
+.github
+ci-out
+cd-run*
