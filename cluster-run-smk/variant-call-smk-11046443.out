@@ -1,0 +1,326 @@
+Using profile profiles/explorer for setting default command line arguments.
+Config file config.yaml is extended by additional config specified via the command line.
+
+SNAKEMAKE
+=========
+  Date: 2026-10-13 15:47:40
+  Workflow ID: 61bc3324-4659-4f37-8fec-9cd5ed5c080d
+  Platform: Linux-5.14.0-362.13.1.el9_3.x86_64-x86_64-with-glibc2.34
+  Host: c3014
+  User: deshpande.aaro
+  Snakemake version: 9.27.0
+  Python version: 3.12.14 (main, Sep  2 2026, 23:27:36) [GCC 15.3.0]
+  Command: /courses/BINF6610.202710/shared/env/binf6610-workflows/bin/snakemake --profile profiles/explorer --config samplesheet=/courses/BINF6610.202710/data/samplesheet-variant8.csv ref=/courses/BINF6610.202710/data/refs/grch38-1000g/GRCh38_full_analysis_set_plus_decoy_hla.fa region=chr20:1-10000000 outdir=results
+  Snakefile: /home/deshpande.aaro/binf6610-assignment1/Snakefile
+  Base directory: /home/deshpande.aaro/binf6610-assignment1
+  Run directory: /home/deshpande.aaro/binf6610-assignment1
+  Working directory: /home/deshpande.aaro/binf6610-assignment1
+  Config file(s): [PosixPath('/home/deshpande.aaro/binf6610-assignment1/profiles/explorer/platform.yaml'), 'config.yaml']
+  Config MD5: 7ca8633d42ad3571369e4c12e7b79180
+
+Building DAG of jobs...
+You are running snakemake in a SLURM job context. This is not recommended, as it may lead to unexpected behavior. If possible, please run Snakemake directly on the login node.
+SLURM run ID: ae94dfed-2520-42ec-8c6b-2bfe92fd089b
+MinJobAge 300s (>= 120s). 'squeue' should work reliably for status queries.
+Using shell: /usr/bin/bash
+Provided remote nodes: 20
+Job stats:
+job                count
+---------------  -------
+validate               1
+fastp_paired           6
+fastp_single           2
+fastqc                 8
+bwa_mem                8
+markduplicates         8
+haplotypecaller        8
+multiqc                1
+joint_genotype         1
+filter                 1
+publish                1
+all                    1
+total                 46
+
+Select jobs to execute...
+Execute 1 jobs...
+
+[Tue Oct 13 15:47:45 2026]
+rule validate:
+    input: /courses/BINF6610.202710/data/samplesheet-variant8.csv, /courses/BINF6610.202710/data/fastq-variant/NA12878_R1.fastq.gz, /courses/BINF6610.202710/data/fastq-variant/NA12878_R2.fastq.gz, /courses/BINF6610.202710/data/fastq-variant/NA12891_R1.fastq.gz, /courses/BINF6610.202710/data/fastq-variant/NA12891_R2.fastq.gz, /courses/BINF6610.202710/data/fastq-variant/NA12892_R1.fastq.gz, /courses/BINF6610.202710/data/fastq-variant/NA07357_R1.fastq.gz, /courses/BINF6610.202710/data/fastq-variant/NA07357_R2.fastq.gz, /courses/BINF6610.202710/data/fastq-variant/NA12003_R1.fastq.gz, /courses/BINF6610.202710/data/fastq-variant/NA10851_R1.fastq.gz, /courses/BINF6610.202710/data/fastq-variant/NA10851_R2.fastq.gz, /courses/BINF6610.202710/data/fastq-variant/NA12813_R1.fastq.gz, /courses/BINF6610.202710/data/fastq-variant/NA12813_R2.fastq.gz, /courses/BINF6610.202710/data/fastq-variant/NA12873_R1.fastq.gz, /courses/BINF6610.202710/data/fastq-variant/NA12873_R2.fastq.gz, /courses/BINF6610.202710/data/refs/grch38-1000g/GRCh38_full_analysis_set_plus_decoy_hla.fa, /courses/BINF6610.202710/data/refs/grch38-1000g/GRCh38_full_analysis_set_plus_decoy_hla.fa.fai, /courses/BINF6610.202710/data/refs/grch38-1000g/GRCh38_full_analysis_set_plus_decoy_hla.fa.amb, /courses/BINF6610.202710/data/refs/grch38-1000g/GRCh38_full_analysis_set_plus_decoy_hla.fa.ann, /courses/BINF6610.202710/data/refs/grch38-1000g/GRCh38_full_analysis_set_plus_decoy_hla.fa.bwt, /courses/BINF6610.202710/data/refs/grch38-1000g/GRCh38_full_analysis_set_plus_decoy_hla.fa.pac, /courses/BINF6610.202710/data/refs/grch38-1000g/GRCh38_full_analysis_set_plus_decoy_hla.fa.sa, /courses/BINF6610.202710/data/refs/grch38-1000g/GRCh38_full_analysis_set_plus_decoy_hla.dict
+    output: work/validate/samplesheet.csv
+    log: logs/validate.log
+    jobid: 7
+    reason: Software environment definition has changed since last execution
+    resources: tmpdir=<TBD>, mem_mb=2000, mem=2 GB, mem_mib=1908, disk_mb=19601, disk=19.6 GB, disk_mib=18693, slurm_account=binf6610.202710, slurm_partition=courses, runtime=30
+Shell command: (/home/deshpande.aaro/binf6610-assignment1/bin/validate_samplesheet.sh /courses/BINF6610.202710/data/samplesheet-variant8.csv /courses/BINF6610.202710/data/refs/grch38-1000g/GRCh38_full_analysis_set_plus_decoy_hla.fa && cp /courses/BINF6610.202710/data/samplesheet-variant8.csv work/validate/samplesheet.csv) 2> logs/validate.log
+Job 7 has been submitted with SLURM jobid 11046447 (log: /home/deshpande.aaro/binf6610-assignment1/.snakemake/slurm_logs/rule_validate/11046447.log).
+[Tue Oct 13 15:51:27 2026]
+Finished jobid: 7 (Rule: validate)
+1 of 46 steps (2%) done
+Select jobs to execute...
+Execute 16 jobs...
+
+[Tue Oct 13 15:51:28 2026]
+rule fastp_paired:
+    input: /courses/BINF6610.202710/data/fastq-variant/NA12873_R1.fastq.gz, /courses/BINF6610.202710/data/fastq-variant/NA12873_R2.fastq.gz, work/validate/samplesheet.csv
+    output: work/trim/NA12873_R1.trim.fastq.gz, work/trim/NA12873_R2.trim.fastq.gz, work/trim/NA12873.fastp.json, work/trim/NA12873.fastp.html
+    log: logs/fastp/NA12873.log
+    jobid: 35
+    reason: Missing output files: work/trim/NA12873_R2.trim.fastq.gz, work/trim/NA12873.fastp.json, work/trim/NA12873_R1.trim.fastq.gz; Input files updated by another job: work/validate/samplesheet.csv
+    wildcards: sample=NA12873
+    resources: tmpdir=<TBD>, mem_mb=2000, mem=2 GB, mem_mib=1908, disk_mb=1000, disk=1 GB, disk_mib=954, slurm_account=binf6610.202710, slurm_partition=courses, runtime=30
+Shell command: fastp -i /courses/BINF6610.202710/data/fastq-variant/NA12873_R1.fastq.gz -I /courses/BINF6610.202710/data/fastq-variant/NA12873_R2.fastq.gz -o work/trim/NA12873_R1.trim.fastq.gz -O work/trim/NA12873_R2.trim.fastq.gz -j work/trim/NA12873.fastp.json -h work/trim/NA12873.fastp.html 2> logs/fastp/NA12873.log
+
+[Tue Oct 13 15:51:28 2026]
+rule fastp_paired:
+    input: /courses/BINF6610.202710/data/fastq-variant/NA12891_R1.fastq.gz, /courses/BINF6610.202710/data/fastq-variant/NA12891_R2.fastq.gz, work/validate/samplesheet.csv
+    output: work/trim/NA12891_R1.trim.fastq.gz, work/trim/NA12891_R2.trim.fastq.gz, work/trim/NA12891.fastp.json, work/trim/NA12891.fastp.html
+    log: logs/fastp/NA12891.log
+    jobid: 11
+    reason: Missing output files: work/trim/NA12891_R2.trim.fastq.gz, work/trim/NA12891_R1.trim.fastq.gz, work/trim/NA12891.fastp.json; Input files updated by another job: work/validate/samplesheet.csv
+    wildcards: sample=NA12891
+    resources: tmpdir=<TBD>, mem_mb=2000, mem=2 GB, mem_mib=1908, disk_mb=1000, disk=1 GB, disk_mib=954, slurm_account=binf6610.202710, slurm_partition=courses, runtime=30
+Shell command: fastp -i /courses/BINF6610.202710/data/fastq-variant/NA12891_R1.fastq.gz -I /courses/BINF6610.202710/data/fastq-variant/NA12891_R2.fastq.gz -o work/trim/NA12891_R1.trim.fastq.gz -O work/trim/NA12891_R2.trim.fastq.gz -j work/trim/NA12891.fastp.json -h work/trim/NA12891.fastp.html 2> logs/fastp/NA12891.log
+
+[Tue Oct 13 15:51:28 2026]
+rule fastp_paired:
+    input: /courses/BINF6610.202710/data/fastq-variant/NA07357_R1.fastq.gz, /courses/BINF6610.202710/data/fastq-variant/NA07357_R2.fastq.gz, work/validate/samplesheet.csv
+    output: work/trim/NA07357_R1.trim.fastq.gz, work/trim/NA07357_R2.trim.fastq.gz, work/trim/NA07357.fastp.json, work/trim/NA07357.fastp.html
+    log: logs/fastp/NA07357.log
+    jobid: 19
+    reason: Missing output files: work/trim/NA07357.fastp.json, work/trim/NA07357_R2.trim.fastq.gz, work/trim/NA07357_R1.trim.fastq.gz; Input files updated by another job: work/validate/samplesheet.csv
+    wildcards: sample=NA07357
+    resources: tmpdir=<TBD>, mem_mb=2000, mem=2 GB, mem_mib=1908, disk_mb=1000, disk=1 GB, disk_mib=954, slurm_account=binf6610.202710, slurm_partition=courses, runtime=30
+Shell command: fastp -i /courses/BINF6610.202710/data/fastq-variant/NA07357_R1.fastq.gz -I /courses/BINF6610.202710/data/fastq-variant/NA07357_R2.fastq.gz -o work/trim/NA07357_R1.trim.fastq.gz -O work/trim/NA07357_R2.trim.fastq.gz -j work/trim/NA07357.fastp.json -h work/trim/NA07357.fastp.html 2> logs/fastp/NA07357.log
+
+[Tue Oct 13 15:51:28 2026]
+rule fastp_paired:
+    input: /courses/BINF6610.202710/data/fastq-variant/NA12813_R1.fastq.gz, /courses/BINF6610.202710/data/fastq-variant/NA12813_R2.fastq.gz, work/validate/samplesheet.csv
+    output: work/trim/NA12813_R1.trim.fastq.gz, work/trim/NA12813_R2.trim.fastq.gz, work/trim/NA12813.fastp.json, work/trim/NA12813.fastp.html
+    log: logs/fastp/NA12813.log
+    jobid: 31
+    reason: Missing output files: work/trim/NA12813.fastp.json, work/trim/NA12813_R2.trim.fastq.gz, work/trim/NA12813_R1.trim.fastq.gz; Input files updated by another job: work/validate/samplesheet.csv
+    wildcards: sample=NA12813
+    resources: tmpdir=<TBD>, mem_mb=2000, mem=2 GB, mem_mib=1908, disk_mb=1000, disk=1 GB, disk_mib=954, slurm_account=binf6610.202710, slurm_partition=courses, runtime=30
+Shell command: fastp -i /courses/BINF6610.202710/data/fastq-variant/NA12813_R1.fastq.gz -I /courses/BINF6610.202710/data/fastq-variant/NA12813_R2.fastq.gz -o work/trim/NA12813_R1.trim.fastq.gz -O work/trim/NA12813_R2.trim.fastq.gz -j work/trim/NA12813.fastp.json -h work/trim/NA12813.fastp.html 2> logs/fastp/NA12813.log
+
+[Tue Oct 13 15:51:28 2026]
+rule fastp_paired:
+    input: /courses/BINF6610.202710/data/fastq-variant/NA12878_R1.fastq.gz, /courses/BINF6610.202710/data/fastq-variant/NA12878_R2.fastq.gz, work/validate/samplesheet.csv
+    output: work/trim/NA12878_R1.trim.fastq.gz, work/trim/NA12878_R2.trim.fastq.gz, work/trim/NA12878.fastp.json, work/trim/NA12878.fastp.html
+    log: logs/fastp/NA12878.log
+    jobid: 6
+    reason: Missing output files: work/trim/NA12878_R2.trim.fastq.gz, work/trim/NA12878.fastp.json, work/trim/NA12878_R1.trim.fastq.gz; Input files updated by another job: work/validate/samplesheet.csv
+    wildcards: sample=NA12878
+    resources: tmpdir=<TBD>, mem_mb=2000, mem=2 GB, mem_mib=1908, disk_mb=1000, disk=1 GB, disk_mib=954, slurm_account=binf6610.202710, slurm_partition=courses, runtime=30
+Shell command: fastp -i /courses/BINF6610.202710/data/fastq-variant/NA12878_R1.fastq.gz -I /courses/BINF6610.202710/data/fastq-variant/NA12878_R2.fastq.gz -o work/trim/NA12878_R1.trim.fastq.gz -O work/trim/NA12878_R2.trim.fastq.gz -j work/trim/NA12878.fastp.json -h work/trim/NA12878.fastp.html 2> logs/fastp/NA12878.log
+
+[Tue Oct 13 15:51:28 2026]
+rule fastp_paired:
+    input: /courses/BINF6610.202710/data/fastq-variant/NA10851_R1.fastq.gz, /courses/BINF6610.202710/data/fastq-variant/NA10851_R2.fastq.gz, work/validate/samplesheet.csv
+    output: work/trim/NA10851_R1.trim.fastq.gz, work/trim/NA10851_R2.trim.fastq.gz, work/trim/NA10851.fastp.json, work/trim/NA10851.fastp.html
+    log: logs/fastp/NA10851.log
+    jobid: 27
+    reason: Missing output files: work/trim/NA10851.fastp.json, work/trim/NA10851_R2.trim.fastq.gz, work/trim/NA10851_R1.trim.fastq.gz; Input files updated by another job: work/validate/samplesheet.csv
+    wildcards: sample=NA10851
+    resources: tmpdir=<TBD>, mem_mb=2000, mem=2 GB, mem_mib=1908, disk_mb=1000, disk=1 GB, disk_mib=954, slurm_account=binf6610.202710, slurm_partition=courses, runtime=30
+Shell command: fastp -i /courses/BINF6610.202710/data/fastq-variant/NA10851_R1.fastq.gz -I /courses/BINF6610.202710/data/fastq-variant/NA10851_R2.fastq.gz -o work/trim/NA10851_R1.trim.fastq.gz -O work/trim/NA10851_R2.trim.fastq.gz -j work/trim/NA10851.fastp.json -h work/trim/NA10851.fastp.html 2> logs/fastp/NA10851.log
+
+[Tue Oct 13 15:51:28 2026]
+rule fastp_single:
+    input: /courses/BINF6610.202710/data/fastq-variant/NA12892_R1.fastq.gz, work/validate/samplesheet.csv
+    output: work/trim/NA12892_R1.trim.fastq.gz, work/trim/NA12892.fastp.json, work/trim/NA12892.fastp.html
+    log: logs/fastp/NA12892.log
+    jobid: 15
+    reason: Missing output files: work/trim/NA12892_R1.trim.fastq.gz, work/trim/NA12892.fastp.json; Input files updated by another job: work/validate/samplesheet.csv
+    wildcards: sample=NA12892
+    resources: tmpdir=<TBD>, mem_mb=2000, mem=2 GB, mem_mib=1908, disk_mb=1000, disk=1 GB, disk_mib=954, slurm_account=binf6610.202710, slurm_partition=courses, runtime=30
+Shell command: fastp -i /courses/BINF6610.202710/data/fastq-variant/NA12892_R1.fastq.gz -o work/trim/NA12892_R1.trim.fastq.gz -j work/trim/NA12892.fastp.json -h work/trim/NA12892.fastp.html 2> logs/fastp/NA12892.log
+
+[Tue Oct 13 15:51:28 2026]
+rule fastp_single:
+    input: /courses/BINF6610.202710/data/fastq-variant/NA12003_R1.fastq.gz, work/validate/samplesheet.csv
+    output: work/trim/NA12003_R1.trim.fastq.gz, work/trim/NA12003.fastp.json, work/trim/NA12003.fastp.html
+    log: logs/fastp/NA12003.log
+    jobid: 23
+    reason: Missing output files: work/trim/NA12003_R1.trim.fastq.gz, work/trim/NA12003.fastp.json; Input files updated by another job: work/validate/samplesheet.csv
+    wildcards: sample=NA12003
+    resources: tmpdir=<TBD>, mem_mb=2000, mem=2 GB, mem_mib=1908, disk_mb=1000, disk=1 GB, disk_mib=954, slurm_account=binf6610.202710, slurm_partition=courses, runtime=30
+Shell command: fastp -i /courses/BINF6610.202710/data/fastq-variant/NA12003_R1.fastq.gz -o work/trim/NA12003_R1.trim.fastq.gz -j work/trim/NA12003.fastp.json -h work/trim/NA12003.fastp.html 2> logs/fastp/NA12003.log
+
+[Tue Oct 13 15:51:28 2026]
+rule fastqc:
+    input: /courses/BINF6610.202710/data/fastq-variant/NA12891_R1.fastq.gz, /courses/BINF6610.202710/data/fastq-variant/NA12891_R2.fastq.gz, work/validate/samplesheet.csv
+    output: work/fastqc/NA12891
+    log: logs/fastqc/NA12891.log
+    jobid: 38
+    reason: Missing output files: work/fastqc/NA12891; Input files updated by another job: work/validate/samplesheet.csv
+    wildcards: sample=NA12891
+    resources: tmpdir=<TBD>, mem_mb=2000, mem=2 GB, mem_mib=1908, disk_mb=1000, disk=1 GB, disk_mib=954, slurm_account=binf6610.202710, slurm_partition=courses, runtime=30
+Shell command: (mkdir -p work/fastqc/NA12891 && fastqc -q -o work/fastqc/NA12891 /courses/BINF6610.202710/data/fastq-variant/NA12891_R1.fastq.gz /courses/BINF6610.202710/data/fastq-variant/NA12891_R2.fastq.gz) 2> logs/fastqc/NA12891.log
+
+[Tue Oct 13 15:51:28 2026]
+rule fastqc:
+    input: /courses/BINF6610.202710/data/fastq-variant/NA07357_R1.fastq.gz, /courses/BINF6610.202710/data/fastq-variant/NA07357_R2.fastq.gz, work/validate/samplesheet.csv
+    output: work/fastqc/NA07357
+    log: logs/fastqc/NA07357.log
+    jobid: 40
+    reason: Missing output files: work/fastqc/NA07357; Input files updated by another job: work/validate/samplesheet.csv
+    wildcards: sample=NA07357
+    resources: tmpdir=<TBD>, mem_mb=2000, mem=2 GB, mem_mib=1908, disk_mb=1000, disk=1 GB, disk_mib=954, slurm_account=binf6610.202710, slurm_partition=courses, runtime=30
+Shell command: (mkdir -p work/fastqc/NA07357 && fastqc -q -o work/fastqc/NA07357 /courses/BINF6610.202710/data/fastq-variant/NA07357_R1.fastq.gz /courses/BINF6610.202710/data/fastq-variant/NA07357_R2.fastq.gz) 2> logs/fastqc/NA07357.log
+
+[Tue Oct 13 15:51:28 2026]
+rule fastqc:
+    input: /courses/BINF6610.202710/data/fastq-variant/NA10851_R1.fastq.gz, /courses/BINF6610.202710/data/fastq-variant/NA10851_R2.fastq.gz, work/validate/samplesheet.csv
+    output: work/fastqc/NA10851
+    log: logs/fastqc/NA10851.log
+    jobid: 42
+    reason: Missing output files: work/fastqc/NA10851; Input files updated by another job: work/validate/samplesheet.csv
+    wildcards: sample=NA10851
+    resources: tmpdir=<TBD>, mem_mb=2000, mem=2 GB, mem_mib=1908, disk_mb=1000, disk=1 GB, disk_mib=954, slurm_account=binf6610.202710, slurm_partition=courses, runtime=30
+Shell command: (mkdir -p work/fastqc/NA10851 && fastqc -q -o work/fastqc/NA10851 /courses/BINF6610.202710/data/fastq-variant/NA10851_R1.fastq.gz /courses/BINF6610.202710/data/fastq-variant/NA10851_R2.fastq.gz) 2> logs/fastqc/NA10851.log
+
+[Tue Oct 13 15:51:28 2026]
+rule fastqc:
+    input: /courses/BINF6610.202710/data/fastq-variant/NA12878_R1.fastq.gz, /courses/BINF6610.202710/data/fastq-variant/NA12878_R2.fastq.gz, work/validate/samplesheet.csv
+    output: work/fastqc/NA12878
+    log: logs/fastqc/NA12878.log
+    jobid: 37
+    reason: Missing output files: work/fastqc/NA12878; Input files updated by another job: work/validate/samplesheet.csv
+    wildcards: sample=NA12878
+    resources: tmpdir=<TBD>, mem_mb=2000, mem=2 GB, mem_mib=1908, disk_mb=1000, disk=1 GB, disk_mib=954, slurm_account=binf6610.202710, slurm_partition=courses, runtime=30
+Shell command: (mkdir -p work/fastqc/NA12878 && fastqc -q -o work/fastqc/NA12878 /courses/BINF6610.202710/data/fastq-variant/NA12878_R1.fastq.gz /courses/BINF6610.202710/data/fastq-variant/NA12878_R2.fastq.gz) 2> logs/fastqc/NA12878.log
+
+[Tue Oct 13 15:51:28 2026]
+rule fastqc:
+    input: /courses/BINF6610.202710/data/fastq-variant/NA12873_R1.fastq.gz, /courses/BINF6610.202710/data/fastq-variant/NA12873_R2.fastq.gz, work/validate/samplesheet.csv
+    output: work/fastqc/NA12873
+    log: logs/fastqc/NA12873.log
+    jobid: 44
+    reason: Missing output files: work/fastqc/NA12873; Input files updated by another job: work/validate/samplesheet.csv
+    wildcards: sample=NA12873
+    resources: tmpdir=<TBD>, mem_mb=2000, mem=2 GB, mem_mib=1908, disk_mb=1000, disk=1 GB, disk_mib=954, slurm_account=binf6610.202710, slurm_partition=courses, runtime=30
+Shell command: (mkdir -p work/fastqc/NA12873 && fastqc -q -o work/fastqc/NA12873 /courses/BINF6610.202710/data/fastq-variant/NA12873_R1.fastq.gz /courses/BINF6610.202710/data/fastq-variant/NA12873_R2.fastq.gz) 2> logs/fastqc/NA12873.log
+
+[Tue Oct 13 15:51:28 2026]
+rule fastqc:
+    input: /courses/BINF6610.202710/data/fastq-variant/NA12892_R1.fastq.gz, work/validate/samplesheet.csv
+    output: work/fastqc/NA12892
+    log: logs/fastqc/NA12892.log
+    jobid: 39
+    reason: Missing output files: work/fastqc/NA12892; Input files updated by another job: work/validate/samplesheet.csv
+    wildcards: sample=NA12892
+    resources: tmpdir=<TBD>, mem_mb=2000, mem=2 GB, mem_mib=1908, disk_mb=1000, disk=1 GB, disk_mib=954, slurm_account=binf6610.202710, slurm_partition=courses, runtime=30
+Shell command: (mkdir -p work/fastqc/NA12892 && fastqc -q -o work/fastqc/NA12892 /courses/BINF6610.202710/data/fastq-variant/NA12892_R1.fastq.gz) 2> logs/fastqc/NA12892.log
+
+[Tue Oct 13 15:51:28 2026]
+rule fastqc:
+    input: /courses/BINF6610.202710/data/fastq-variant/NA12003_R1.fastq.gz, work/validate/samplesheet.csv
+    output: work/fastqc/NA12003
+    log: logs/fastqc/NA12003.log
+    jobid: 41
+    reason: Missing output files: work/fastqc/NA12003; Input files updated by another job: work/validate/samplesheet.csv
+    wildcards: sample=NA12003
+    resources: tmpdir=<TBD>, mem_mb=2000, mem=2 GB, mem_mib=1908, disk_mb=1000, disk=1 GB, disk_mib=954, slurm_account=binf6610.202710, slurm_partition=courses, runtime=30
+Shell command: (mkdir -p work/fastqc/NA12003 && fastqc -q -o work/fastqc/NA12003 /courses/BINF6610.202710/data/fastq-variant/NA12003_R1.fastq.gz) 2> logs/fastqc/NA12003.log
+
+[Tue Oct 13 15:51:28 2026]
+rule fastqc:
+    input: /courses/BINF6610.202710/data/fastq-variant/NA12813_R1.fastq.gz, /courses/BINF6610.202710/data/fastq-variant/NA12813_R2.fastq.gz, work/validate/samplesheet.csv
+    output: work/fastqc/NA12813
+    log: logs/fastqc/NA12813.log
+    jobid: 43
+    reason: Missing output files: work/fastqc/NA12813; Input files updated by another job: work/validate/samplesheet.csv
+    wildcards: sample=NA12813
+    resources: tmpdir=<TBD>, mem_mb=2000, mem=2 GB, mem_mib=1908, disk_mb=1000, disk=1 GB, disk_mib=954, slurm_account=binf6610.202710, slurm_partition=courses, runtime=30
+Shell command: (mkdir -p work/fastqc/NA12813 && fastqc -q -o work/fastqc/NA12813 /courses/BINF6610.202710/data/fastq-variant/NA12813_R1.fastq.gz /courses/BINF6610.202710/data/fastq-variant/NA12813_R2.fastq.gz) 2> logs/fastqc/NA12813.log
+[Tue Oct 13 15:53:10 2026]
+Error in rule fastp_paired:
+    message: SLURM sbatch failed. The error message was 'sbatch: error: Batch job submission failed: Unexpected message received'.
+    sbatch call:
+        sbatch --parsable --job-name ae94dfed-2520-42ec-8c6b-2bfe92fd089b --output /home/deshpande.aaro/binf6610-assignment1/.snakemake/slurm_logs/rule_fastp_paired/NA12873/%j.log --export=ALL --comment rule_fastp_paired_wildcards_NA12873  -A binf6610.202710  -p courses -t 30 --mem 2000 --ntasks=1 --cpus-per-task=1 -D /home/deshpande.aaro/binf6610-assignment1 --wrap="/courses/BINF6610.202710/shared/env/binf6610-workflows/bin/python3.12 -m snakemake --snakefile '/home/deshpande.aaro/binf6610-assignment1/Snakefile' --target-jobs 'fastp_paired:sample=NA12873' --allowed-rules fastp_paired --cores 'all' --attempt 1 --force-use-threads  --wait-for-files '/home/deshpande.aaro/binf6610-assignment1/.snakemake/tmp.rkzxhpg6' '/courses/BINF6610.202710/data/fastq-variant/NA12873_R1.fastq.gz' '/courses/BINF6610.202710/data/fastq-variant/NA12873_R2.fastq.gz' 'work/validate/samplesheet.csv' --force --target-files-omit-workdir-adjustment --max-inventory-time 0 --retries 0 --nocolor --no-hooks --nolock --ignore-incomplete --rerun-triggers params code software-env input mtime --deployment-method apptainer --conda-frontend 'conda' --apptainer-prefix '/courses/BINF6610.202710/shared/snakemake-images' --apptainer-args base64//LS1iaW5kIC9jb3Vyc2VzLC9zY3JhdGNo --shared-fs-usage software-deployment input-output source-cache storage-local-copies software-deployment-cache sources persistence --config 'samplesheet=/courses/BINF6610.202710/data/samplesheet-variant8.csv' 'ref=/courses/BINF6610.202710/data/refs/grch38-1000g/GRCh38_full_analysis_set_plus_decoy_hla.fa' 'region=chr20:1-10000000' 'outdir=results' --printshellcmds  --latency-wait 60 --scheduler 'ilp' --local-storage-prefix base64//LnNuYWtlbWFrZS9zdG9yYWdl --scheduler-solver-path '/courses/BINF6610.202710/shared/env/binf6610-workflows/bin' --runtime-source-cache-path '/home/deshpande.aaro/.cache/snakemake/snakemake/source-cache/snakemake-runtime-cache/tmp10k0opkx' --configfiles /home/deshpande.aaro/binf6610-assignment1/profiles/explorer/platform.yaml --set-resources base64//YndhX21lbTpydW50aW1lPTYw base64//YndhX21lbTptZW1fbWI9MTYwMDA= base64//aGFwbG90eXBlY2FsbGVyOnJ1bnRpbWU9NjA= base64//aGFwbG90eXBlY2FsbGVyOm1lbV9tYj0xNjAwMA== base64//bWFya2R1cGxpY2F0ZXM6cnVudGltZT02MA== base64//bWFya2R1cGxpY2F0ZXM6bWVtX21iPTgwMDA= base64//am9pbnRfZ2Vub3R5cGU6cnVudGltZT02MA== base64//am9pbnRfZ2Vub3R5cGU6bWVtX21iPTgwMDA= base64//ZmlsdGVyOnJ1bnRpbWU9NjA= base64//ZmlsdGVyOm1lbV9tYj04MDAw --default-resources base64//dG1wZGlyPXN5c3RlbV90bXBkaXI= base64//bWVtX21iPTIwMDA= base64//c2x1cm1fYWNjb3VudD1iaW5mNjYxMC4yMDI3MTA= base64//c2x1cm1fcGFydGl0aW9uPWNvdXJzZXM= base64//cnVudGltZT0zMA== --executor slurm-jobstep --jobs 1 --mode 'remote'"
+For further error details see the cluster/cloud log and the log files of the involved rule(s).
+    jobid: 35
+    input: /courses/BINF6610.202710/data/fastq-variant/NA12873_R1.fastq.gz, /courses/BINF6610.202710/data/fastq-variant/NA12873_R2.fastq.gz, work/validate/samplesheet.csv
+    output: work/trim/NA12873_R1.trim.fastq.gz, work/trim/NA12873_R2.trim.fastq.gz, work/trim/NA12873.fastp.json, work/trim/NA12873.fastp.html
+    log: logs/fastp/NA12873.log (check log file(s) for error details)
+    shell:
+        fastp -i /courses/BINF6610.202710/data/fastq-variant/NA12873_R1.fastq.gz -I /courses/BINF6610.202710/data/fastq-variant/NA12873_R2.fastq.gz -o work/trim/NA12873_R1.trim.fastq.gz -O work/trim/NA12873_R2.trim.fastq.gz -j work/trim/NA12873.fastp.json -h work/trim/NA12873.fastp.html 2> logs/fastp/NA12873.log
+        (command exited with non-zero exit code)
+[Tue Oct 13 15:53:10 2026]
+Error in rule fastp_paired:
+    message: SLURM sbatch failed. The error message was 'sbatch: error: Batch job submission failed: Unexpected message received'.
+    sbatch call:
+        sbatch --parsable --job-name ae94dfed-2520-42ec-8c6b-2bfe92fd089b --output /home/deshpande.aaro/binf6610-assignment1/.snakemake/slurm_logs/rule_fastp_paired/NA12891/%j.log --export=ALL --comment rule_fastp_paired_wildcards_NA12891  -A binf6610.202710  -p courses -t 30 --mem 2000 --ntasks=1 --cpus-per-task=1 -D /home/deshpande.aaro/binf6610-assignment1 --wrap="/courses/BINF6610.202710/shared/env/binf6610-workflows/bin/python3.12 -m snakemake --snakefile '/home/deshpande.aaro/binf6610-assignment1/Snakefile' --target-jobs 'fastp_paired:sample=NA12891' --allowed-rules fastp_paired --cores 'all' --attempt 1 --force-use-threads  --wait-for-files '/home/deshpande.aaro/binf6610-assignment1/.snakemake/tmp.rkzxhpg6' '/courses/BINF6610.202710/data/fastq-variant/NA12891_R1.fastq.gz' '/courses/BINF6610.202710/data/fastq-variant/NA12891_R2.fastq.gz' 'work/validate/samplesheet.csv' --force --target-files-omit-workdir-adjustment --max-inventory-time 0 --retries 0 --nocolor --no-hooks --nolock --ignore-incomplete --rerun-triggers params code software-env input mtime --deployment-method apptainer --conda-frontend 'conda' --apptainer-prefix '/courses/BINF6610.202710/shared/snakemake-images' --apptainer-args base64//LS1iaW5kIC9jb3Vyc2VzLC9zY3JhdGNo --shared-fs-usage software-deployment input-output source-cache storage-local-copies software-deployment-cache sources persistence --config 'samplesheet=/courses/BINF6610.202710/data/samplesheet-variant8.csv' 'ref=/courses/BINF6610.202710/data/refs/grch38-1000g/GRCh38_full_analysis_set_plus_decoy_hla.fa' 'region=chr20:1-10000000' 'outdir=results' --printshellcmds  --latency-wait 60 --scheduler 'ilp' --local-storage-prefix base64//LnNuYWtlbWFrZS9zdG9yYWdl --scheduler-solver-path '/courses/BINF6610.202710/shared/env/binf6610-workflows/bin' --runtime-source-cache-path '/home/deshpande.aaro/.cache/snakemake/snakemake/source-cache/snakemake-runtime-cache/tmp10k0opkx' --configfiles /home/deshpande.aaro/binf6610-assignment1/profiles/explorer/platform.yaml --set-resources base64//YndhX21lbTpydW50aW1lPTYw base64//YndhX21lbTptZW1fbWI9MTYwMDA= base64//aGFwbG90eXBlY2FsbGVyOnJ1bnRpbWU9NjA= base64//aGFwbG90eXBlY2FsbGVyOm1lbV9tYj0xNjAwMA== base64//bWFya2R1cGxpY2F0ZXM6cnVudGltZT02MA== base64//bWFya2R1cGxpY2F0ZXM6bWVtX21iPTgwMDA= base64//am9pbnRfZ2Vub3R5cGU6cnVudGltZT02MA== base64//am9pbnRfZ2Vub3R5cGU6bWVtX21iPTgwMDA= base64//ZmlsdGVyOnJ1bnRpbWU9NjA= base64//ZmlsdGVyOm1lbV9tYj04MDAw --default-resources base64//dG1wZGlyPXN5c3RlbV90bXBkaXI= base64//bWVtX21iPTIwMDA= base64//c2x1cm1fYWNjb3VudD1iaW5mNjYxMC4yMDI3MTA= base64//c2x1cm1fcGFydGl0aW9uPWNvdXJzZXM= base64//cnVudGltZT0zMA== --executor slurm-jobstep --jobs 1 --mode 'remote'"
+For further error details see the cluster/cloud log and the log files of the involved rule(s).
+    jobid: 11
+    input: /courses/BINF6610.202710/data/fastq-variant/NA12891_R1.fastq.gz, /courses/BINF6610.202710/data/fastq-variant/NA12891_R2.fastq.gz, work/validate/samplesheet.csv
+    output: work/trim/NA12891_R1.trim.fastq.gz, work/trim/NA12891_R2.trim.fastq.gz, work/trim/NA12891.fastp.json, work/trim/NA12891.fastp.html
+    log: logs/fastp/NA12891.log (check log file(s) for error details)
+    shell:
+        fastp -i /courses/BINF6610.202710/data/fastq-variant/NA12891_R1.fastq.gz -I /courses/BINF6610.202710/data/fastq-variant/NA12891_R2.fastq.gz -o work/trim/NA12891_R1.trim.fastq.gz -O work/trim/NA12891_R2.trim.fastq.gz -j work/trim/NA12891.fastp.json -h work/trim/NA12891.fastp.html 2> logs/fastp/NA12891.log
+        (command exited with non-zero exit code)
+Job 19 has been submitted with SLURM jobid 11046610 (log: /home/deshpande.aaro/binf6610-assignment1/.snakemake/slurm_logs/rule_fastp_paired/NA07357/11046610.log).
+Job 31 has been submitted with SLURM jobid 11046612 (log: /home/deshpande.aaro/binf6610-assignment1/.snakemake/slurm_logs/rule_fastp_paired/NA12813/11046612.log).
+Job 27 has been submitted with SLURM jobid 11046615 (log: /home/deshpande.aaro/binf6610-assignment1/.snakemake/slurm_logs/rule_fastp_paired/NA10851/11046615.log).
+Job 15 has been submitted with SLURM jobid 11046631 (log: /home/deshpande.aaro/binf6610-assignment1/.snakemake/slurm_logs/rule_fastp_single/NA12892/11046631.log).
+Job 6 has been submitted with SLURM jobid 11046633 (log: /home/deshpande.aaro/binf6610-assignment1/.snakemake/slurm_logs/rule_fastp_paired/NA12878/11046633.log).
+Job 23 has been submitted with SLURM jobid 11046637 (log: /home/deshpande.aaro/binf6610-assignment1/.snakemake/slurm_logs/rule_fastp_single/NA12003/11046637.log).
+Job 38 has been submitted with SLURM jobid 11046639 (log: /home/deshpande.aaro/binf6610-assignment1/.snakemake/slurm_logs/rule_fastqc/NA12891/11046639.log).
+Job 42 has been submitted with SLURM jobid 11046640 (log: /home/deshpande.aaro/binf6610-assignment1/.snakemake/slurm_logs/rule_fastqc/NA10851/11046640.log).
+Job 40 has been submitted with SLURM jobid 11046641 (log: /home/deshpande.aaro/binf6610-assignment1/.snakemake/slurm_logs/rule_fastqc/NA07357/11046641.log).
+Job 44 has been submitted with SLURM jobid 11046643 (log: /home/deshpande.aaro/binf6610-assignment1/.snakemake/slurm_logs/rule_fastqc/NA12873/11046643.log).
+Job 37 has been submitted with SLURM jobid 11046645 (log: /home/deshpande.aaro/binf6610-assignment1/.snakemake/slurm_logs/rule_fastqc/NA12878/11046645.log).
+Job 39 has been submitted with SLURM jobid 11046647 (log: /home/deshpande.aaro/binf6610-assignment1/.snakemake/slurm_logs/rule_fastqc/NA12892/11046647.log).
+Job 41 has been submitted with SLURM jobid 11046648 (log: /home/deshpande.aaro/binf6610-assignment1/.snakemake/slurm_logs/rule_fastqc/NA12003/11046648.log).
+Job 43 has been submitted with SLURM jobid 11046652 (log: /home/deshpande.aaro/binf6610-assignment1/.snakemake/slurm_logs/rule_fastqc/NA12813/11046652.log).
+[Tue Oct 13 15:55:20 2026]
+Finished jobid: 19 (Rule: fastp_paired)
+2 of 46 steps (4%) done
+[Tue Oct 13 15:55:23 2026]
+Finished jobid: 31 (Rule: fastp_paired)
+3 of 46 steps (7%) done
+[Tue Oct 13 15:55:24 2026]
+Finished jobid: 27 (Rule: fastp_paired)
+4 of 46 steps (9%) done
+[Tue Oct 13 15:55:26 2026]
+Finished jobid: 15 (Rule: fastp_single)
+5 of 46 steps (11%) done
+[Tue Oct 13 15:55:28 2026]
+Finished jobid: 6 (Rule: fastp_paired)
+6 of 46 steps (13%) done
+[Tue Oct 13 15:55:28 2026]
+Finished jobid: 38 (Rule: fastqc)
+7 of 46 steps (15%) done
+[Tue Oct 13 15:55:29 2026]
+Finished jobid: 23 (Rule: fastp_single)
+8 of 46 steps (17%) done
+[Tue Oct 13 15:55:30 2026]
+Finished jobid: 42 (Rule: fastqc)
+9 of 46 steps (20%) done
+[Tue Oct 13 15:55:30 2026]
+Finished jobid: 39 (Rule: fastqc)
+10 of 46 steps (22%) done
+[Tue Oct 13 15:55:31 2026]
+Finished jobid: 41 (Rule: fastqc)
+11 of 46 steps (24%) done
+[Tue Oct 13 15:56:11 2026]
+Finished jobid: 40 (Rule: fastqc)
+12 of 46 steps (26%) done
+[Tue Oct 13 15:56:12 2026]
+Finished jobid: 44 (Rule: fastqc)
+13 of 46 steps (28%) done
+[Tue Oct 13 15:56:52 2026]
+Finished jobid: 37 (Rule: fastqc)
+14 of 46 steps (30%) done
+[Tue Oct 13 15:56:53 2026]
+Finished jobid: 43 (Rule: fastqc)
+15 of 46 steps (33%) done
+Shutting down, this might take some time.
+Cleaning up SLURM log files older than 10 day(s).
+Exiting because a job execution failed. Look above for error messages
+Complete log(s): /home/deshpande.aaro/binf6610-assignment1/.snakemake/log/2026-10-13T154740.022651.snakemake.log
+Elapsed time: 0:09:53.021892
+WorkflowError:
+At least one job did not complete successfully.
