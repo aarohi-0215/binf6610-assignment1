@@ -1,13 +1,21 @@
-# BINF6610: Germline Variant-Calling Pipeline (Bash)
+# BINF6610: a database of the variant-call runs
 
-A ten-stage bash pipeline that turns raw sequencing reads into a filtered cohort VCF: validate, QC, trim, align (BWA-MEM), postprocess, per-sample calling (GATK HaplotypeCaller), joint genotyping, hard-filtering, MultiQC, and publish. Driven entirely by a samplesheet, with strict validation that fails loudly rather than producing plausible wrong answers.
+Assignment 9. The runs of the variant-call pipeline from weeks 4 to 6, loaded into one SQLite database, so one query answers a question about every run at once.
 
-Run: `./run_pipeline.sh <samplesheet.csv> <outdir> [last-stage]`
+| Folder | The run |
+|---|---|
+| `smoke-run-nf/` | week 4, Nextflow, laptop, the smoke dataset (3 samples) |
+| `cluster-run-nf/` | week 4, Nextflow, Explorer, the cohort (8 samples) |
+| `smoke-run-smk/` | week 5, Snakemake, laptop, the smoke dataset (3 samples) |
+| `cluster-run-smk/` | week 5, Snakemake, Explorer, the cohort (8 samples) |
+| `aws-run-nf/` | week 6, Nextflow on AWS Batch, the smoke dataset (3 samples) |
 
-## Assignment 8: CI and CD
+`db/schema.sql` makes the six tables (pipelines, runs, samples, run_samples, variants, outputs), with keys that refuse a repeated run, a row pointing at something that does not exist, and the same sample twice in one run. `db/load.py` loads the sample metadata (`db/variant-call-cohort.tsv`) and each run folder, each run whole or not at all, and skips a run that is already loaded. `db/queries/q1.sql` to `q6.sql` answer the six questions.
 
-CI (`.github/workflows/ci.yml`) runs on every push to `main` and every pull request: ShellCheck over the pipeline's scripts, then the whole pipeline on the smoke dataset in `tests/smoke/`, inside the image built from `containers/Dockerfile`. It checks the manifest against the course's contract (`tools/check_manifest.py`), that the manifest names the commit tested, and that the variant records match `aws-run/`, made by the same tools.
+Build and query it from the top of the repository:
 
-CD (`.github/workflows/cd.yml`) runs on every version tag: it builds `aws/Dockerfile`, pushes it to ECR, registers `aws/job-definition.json` with that image by its digest, and runs the smoke dataset on AWS Batch. The results of release `v1.0.0` are in `cd-run/`. `teardown-check.txt` shows that everything made in AWS was deleted afterwards.
+    sqlite3 runs.db < db/schema.sql
+    python3 db/load.py runs.db db/variant-call-cohort.tsv smoke-run-nf cluster-run-nf smoke-run-smk cluster-run-smk aws-run-nf
+    sqlite3 -header -column runs.db < db/queries/q1.sql
 
-Each earlier assignment is on its own branch: `master` (Assignment 1), `week2` (Slurm), `week3` (containers), `week4` (Nextflow), `week5` (Snakemake) and `week6` (AWS Batch).
+`runs.db` itself is not committed. Each earlier assignment is on its own branch: `master` (1), `week2` to `week6` (2 to 6) and `week8` (8, CI and CD); assignment 7 was a quiz.
